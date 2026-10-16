@@ -1,0 +1,8 @@
+-r requirements.txt
+pytest>=8.0
+# Optional online AI provider (also exercised by the tests, over a mock transport).
+anthropic>=1.8,<2
+# Coverage reports for quality passes (python -m coverage run -m pytest).
+coverage>=7.6
+# Windows packaging (python packaging/build.py).
+pyinstaller>=6.10

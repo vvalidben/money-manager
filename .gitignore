@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Build / packaging (PyInstaller)
+build/
+dist/
+# Generated spec files; the maintained one is packaging/MoneyManager.spec.
+*.spec
+!packaging/MoneyManager.spec
+.coverage
+# A real configuration next to the program (the example is committed).
+MoneyManager.ini
+
+# Local data — never commit a financial database or logs
+*.db
+*.db-wal
+*.db-shm
+*.log
+
+# Tool output
+graphify-out/
+
+# Secrets: API keys belong in the Windows Credential Manager or the environment,
+# never in files inside the project.
+.env
+.env.*
+*.key
+secrets.*
+
+# Release archives (python packaging/build.py)
+release/

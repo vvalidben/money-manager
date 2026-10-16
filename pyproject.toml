@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "money-manager"
+version = "1.0.0"
+description = "Local-first personal money management desktop application."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "PySide6>=6.7",
+    "SQLAlchemy>=2.0",
+    "matplotlib>=3.8",
+    "alembic>=1.13",
+]
+
+[project.optional-dependencies]
+# Online AI (Anthropic's Claude API). Not needed for local AI (Ollama) or with AI off.
+ai-online = [
+    "anthropic>=1.8,<2",
+]
+dev = [
+    "pytest>=8.0",
+    "anthropic>=1.8,<2",
+]
+
+[project.gui-scripts]
+money-manager = "money_manager.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"money_manager.ui" = ["assets/*.svg"]
+"money_manager.persistence" = ["migrations/script.py.mako"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+addopts = "-ra"
+filterwarnings = [
+    # Harmless: a chart briefly too small to lay out while a window is resized
+    # (the application filters it too; pytest resets warning filters per test).
+    "ignore:constrained_layout not applied:UserWarning",
+]

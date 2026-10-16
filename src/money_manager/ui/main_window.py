@@ -1,0 +1,262 @@
+"""Main application window: sidebar on the left, page stack on the right."""
+
+import logging
+
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from money_manager import APP_NAME
+from money_manager.core.config import AppConfig
+from money_manager.services import AppServices
+from money_manager.ui.advisor.advisor_page import AdvisorPage
+from money_manager.ui.components import StatCard
+from money_manager.ui.dashboard.dashboard_page import DashboardPage
+from money_manager.ui.goals.goals_page import GoalsPage
+from money_manager.ui.investments.investments_page import InvestmentsPage
+from money_manager.ui.navigation import (
+    ICON_PATHS,
+    PLUS_PATH,
+    SEARCH_PATH,
+    SIDEBAR_WIDTH,
+    NavItem,
+    Sidebar,
+    line_icon,
+)
+from money_manager.ui.pages import (
+    AI_ADVISOR_PAGE_KEY,
+    DASHBOARD_PAGE_KEY,
+    DEFAULT_PAGE_KEY,
+    GOALS_PAGE_KEY,
+    INVESTMENTS_PAGE_KEY,
+    PAGES,
+    SETTINGS_PAGE_KEY,
+    STATISTICS_PAGE_KEY,
+    SUBSCRIPTIONS_PAGE_KEY,
+    TRANSACTIONS_PAGE_KEY,
+    BasePage,
+    PageSpec,
+    PlaceholderPage,
+    SettingsPage,
+)
+from money_manager.ui.statistics.statistics_page import StatisticsPage
+from money_manager.ui.subscriptions.subscriptions_page import SubscriptionsPage
+from money_manager.ui.theme import Colors, page_fill
+from money_manager.ui.transactions.transactions_page import TransactionsPage
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_WINDOW_SIZE = QSize(1200, 760)
+MINIMUM_WINDOW_SIZE = QSize(960, 600)
+
+
+class MainWindow(QMainWindow):
+    # The data behind the services changed (currency, import, reset): the
+    # application should rebuild its services and window, then show this page.
+    reload_requested = Signal(str)
+
+    def __init__(
+        self, config: AppConfig, services: AppServices, parent: QWidget | None = None
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(APP_NAME)
+        self.setMinimumSize(MINIMUM_WINDOW_SIZE)
+        self.resize(DEFAULT_WINDOW_SIZE)
+
+        self._pages: dict[str, BasePage] = {}
+        self._stack = QStackedWidget()
+        for spec in PAGES:
+            page = self._create_page(spec, config, services)
+            page.navigate_requested.connect(self.show_page)
+            if isinstance(page, SettingsPage):
+                page.reload_requested.connect(self.reload_requested)
+            self._pages[spec.key] = page
+            self._stack.addWidget(page)
+
+        for spec in PAGES:
+            self._fill_headline(self._pages[spec.key], spec)
+
+        content_area = QWidget()
+        content_area.setObjectName("ContentArea")
+        content_area.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        content_layout = QVBoxLayout(content_area)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.addWidget(self._stack)
+
+        # The rail is not in the layout: a fixed spacer keeps its place and the
+        # rail itself overlays the page when it expands.
+        central = QWidget()
+        central.setObjectName("ContentArea")
+        central.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        rail_space = QWidget()
+        rail_space.setFixedWidth(SIDEBAR_WIDTH)
+        layout = QHBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(rail_space)
+        layout.addWidget(content_area, 1)
+        self.setCentralWidget(central)
+        central.installEventFilter(self)
+
+        self._sidebar = Sidebar([NavItem(spec.key, spec.nav_label) for spec in PAGES], central)
+        self._sidebar.page_selected.connect(self.show_page)
+        self._global_controls = self._build_global_controls()
+        self._controls_host: BasePage | None = None
+        self._install_shortcuts()
+
+        self.show_page(DEFAULT_PAGE_KEY)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802
+        if watched is self.centralWidget() and event.type() == QEvent.Type.Resize:
+            self._sidebar.place(self.centralWidget().height())
+        return super().eventFilter(watched, event)
+
+    # ------------------------------------------------------------ global controls
+
+    def _build_global_controls(self) -> QWidget:
+        """Search, Ask AI and New entry: shown in the header of whichever page is open."""
+        self.global_search = QLineEdit()
+        self.global_search.setObjectName("GlobalSearch")
+        self.global_search.setPlaceholderText("Search entries")
+        self.global_search.setAccessibleName("Search entries")
+        self.global_search.setToolTip("Search transactions: type and press Enter")
+        self.global_search.setClearButtonEnabled(True)
+        self.global_search.setMinimumWidth(180)
+        self.global_search.addAction(line_icon(SEARCH_PATH, Colors.TEXT_MUTED, 16),
+                                     QLineEdit.ActionPosition.LeadingPosition)
+        self.global_search.returnPressed.connect(self.search_entries)
+
+        self.ask_button = QPushButton("Ask AI")
+        self.ask_button.setIcon(line_icon(ICON_PATHS[AI_ADVISOR_PAGE_KEY], Colors.CYAN, 16))
+        self.ask_button.setToolTip("Open the AI Advisor")
+        self.ask_button.clicked.connect(self.ask_ai)
+
+        self.new_entry_button = QPushButton("New entry")
+        self.new_entry_button.setObjectName("PrimaryButton")
+        self.new_entry_button.setIcon(line_icon(PLUS_PATH, Colors.ON_ACCENT, 16, 2.2))
+        self.new_entry_button.setToolTip("Record a transaction")
+        self.new_entry_button.clicked.connect(self.new_entry)
+
+        controls = QWidget()
+        row = QHBoxLayout(controls)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+        row.addWidget(self.global_search)
+        row.addWidget(self.ask_button)
+        row.addWidget(self.new_entry_button)
+        return controls
+
+    def _move_global_controls(self, page: BasePage) -> None:
+        if self._controls_host is not None and self._controls_host is not page:
+            self._controls_host.header.detach(self._global_controls)
+        key = page.spec.key
+        # Pages with their own search or add button do not repeat them.
+        self.global_search.setVisible(key not in (TRANSACTIONS_PAGE_KEY, AI_ADVISOR_PAGE_KEY))
+        self.new_entry_button.setVisible(key != TRANSACTIONS_PAGE_KEY)
+        self.ask_button.setVisible(key != AI_ADVISOR_PAGE_KEY)
+        # One filled button per header: a page's own main action keeps the lime.
+        self.new_entry_button.setObjectName(
+            "" if page.primary_button is not None else "PrimaryButton")
+        self.new_entry_button.setIcon(line_icon(
+            PLUS_PATH, Colors.ON_ACCENT if page.primary_button is None else Colors.TEXT, 16, 2.2))
+        self.new_entry_button.style().unpolish(self.new_entry_button)
+        self.new_entry_button.style().polish(self.new_entry_button)
+        if self._controls_host is not page:
+            page.header.attach(self._global_controls)
+            self._controls_host = page
+
+    def search_entries(self) -> None:
+        text = self.global_search.text().strip()
+        self.show_page(TRANSACTIONS_PAGE_KEY)
+        page = self.current_page
+        if page.search_field is not None:
+            page.search_field.setText(text)
+        page.focus_search()
+        self.global_search.clear()
+
+    def ask_ai(self) -> None:
+        self.show_page(AI_ADVISOR_PAGE_KEY)
+        self.current_page.focus_search()
+
+    def new_entry(self) -> None:
+        """Open the transaction dialog; without an account the page shows how to add one."""
+        self.show_page(TRANSACTIONS_PAGE_KEY)
+        self.current_page.trigger_primary()
+
+    @staticmethod
+    def _fill_headline(page: BasePage, spec: PageSpec) -> None:
+        """The page's first figure becomes its headline tile, in the page's colour."""
+        figures = page.findChildren(StatCard)
+        if figures:
+            figures[0].set_fill(page_fill(spec.key))
+
+    def _install_shortcuts(self) -> None:
+        """Ctrl+1…9 pages · Ctrl+N new item · Ctrl+F search · F5 refresh."""
+        for number, spec in enumerate(PAGES[:9], start=1):
+            sequence = QKeySequence(f"Ctrl+{number}")
+            QShortcut(sequence, self, lambda key=spec.key: self.show_page(key))
+            self._sidebar.button(spec.key).setToolTip(
+                f"{spec.nav_label} ({sequence.toString(QKeySequence.SequenceFormat.NativeText)})")
+        QShortcut(QKeySequence(QKeySequence.StandardKey.New), self,
+                  lambda: self.current_page.trigger_primary())
+        QShortcut(QKeySequence(QKeySequence.StandardKey.Find), self,
+                  lambda: self.current_page.focus_search())
+        QShortcut(QKeySequence(QKeySequence.StandardKey.Refresh), self,
+                  lambda: self.current_page.force_refresh())
+
+    @property
+    def sidebar(self) -> Sidebar:
+        return self._sidebar
+
+    @property
+    def current_page(self) -> BasePage:
+        page = self._stack.currentWidget()
+        assert isinstance(page, BasePage)
+        return page
+
+    def page(self, key: str) -> BasePage:
+        return self._pages[key]
+
+    def show_page(self, key: str) -> None:
+        if key not in self._pages:
+            raise KeyError(f"Unknown page: {key!r}")
+        page = self._pages[key]
+        self._stack.setCurrentWidget(page)
+        self._sidebar.set_current(key)
+        self._move_global_controls(page)
+        # Keep keyboard focus in the sidebar on the page now shown, so the focus
+        # ring never lingers on the page that was left (shortcut or link navigation).
+        focused = QApplication.focusWidget()
+        if focused is not None and self._sidebar.isAncestorOf(focused):
+            self._sidebar.button(key).setFocus()
+        page.on_shown()
+        logger.debug("Showing page %s", key)
+
+    @staticmethod
+    def _create_page(spec: PageSpec, config: AppConfig, services: AppServices) -> BasePage:
+        if spec.key == SETTINGS_PAGE_KEY:
+            return SettingsPage(spec, config, services)
+        if spec.key == TRANSACTIONS_PAGE_KEY:
+            return TransactionsPage(spec, services)
+        if spec.key == DASHBOARD_PAGE_KEY:
+            return DashboardPage(spec, services)
+        if spec.key == STATISTICS_PAGE_KEY:
+            return StatisticsPage(spec, services)
+        if spec.key == GOALS_PAGE_KEY:
+            return GoalsPage(spec, services)
+        if spec.key == SUBSCRIPTIONS_PAGE_KEY:
+            return SubscriptionsPage(spec, services)
+        if spec.key == INVESTMENTS_PAGE_KEY:
+            return InvestmentsPage(spec, services)
+        if spec.key == AI_ADVISOR_PAGE_KEY:
+            return AdvisorPage(spec, services)
+        return PlaceholderPage(spec)
