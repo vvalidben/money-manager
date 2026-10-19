@@ -11,6 +11,9 @@ from money_manager.persistence.repositories.allocation_transfer_repository impor
 )
 from money_manager.persistence.repositories.budget_repository import BudgetRepository
 from money_manager.persistence.repositories.category_repository import CategoryRepository
+from money_manager.persistence.repositories.category_rule_repository import (
+    CategoryRuleRepository,
+)
 from money_manager.persistence.repositories.goal_repository import GoalRepository
 from money_manager.persistence.repositories.investment_repository import InvestmentRepository
 from money_manager.persistence.repositories.setting_repository import SettingRepository
@@ -27,6 +30,7 @@ __all__ = [
     "AllocationTransferRepository",
     "BudgetRepository",
     "CategoryRepository",
+    "CategoryRuleRepository",
     "GoalRepository",
     "InvestmentRepository",
     "SettingRepository",

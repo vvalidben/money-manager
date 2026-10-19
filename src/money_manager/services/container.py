@@ -19,11 +19,13 @@ from money_manager.services.analysis_service import FinancialAnalysisService
 from money_manager.services.allocation_transfer_service import AllocationTransferService
 from money_manager.services.balance_service import BalanceService
 from money_manager.services.budget_service import BudgetService
+from money_manager.services.category_rule_service import CategoryRuleService
 from money_manager.services.category_service import CategoryService
 from money_manager.services.data_service import DataService
 from money_manager.services.dashboard_service import DashboardService
 from money_manager.services.goal_service import GoalService
 from money_manager.services.investment_service import InvestmentService
+from money_manager.services.net_worth_service import NetWorthService
 from money_manager.services.settings_service import SettingsService
 from money_manager.services.statement_import_service import StatementImportService
 from money_manager.services.statistics_service import StatisticsService
@@ -42,11 +44,13 @@ class AppServices:
     account_transfers: AccountTransferService
     budgets: BudgetService
     statements: StatementImportService
+    category_rules: CategoryRuleService
     dashboard: DashboardService
     statistics: StatisticsService
     goals: GoalService
     subscriptions: SubscriptionService
     investments: InvestmentService
+    net_worth: NetWorthService
     analysis: FinancialAnalysisService
     ai: AIService
     settings: SettingsService
@@ -78,6 +82,9 @@ class AppServices:
         analysis = FinancialAnalysisService(database, today=today, base_currency=base_currency)
         transactions = TransactionService(database, today=today, base_currency=base_currency)
         balances = BalanceService(database, transactions, today=today, base_currency=base_currency)
+        rules = CategoryRuleService(database)
+        investments = InvestmentService(database, transactions, today=today,
+                                        base_currency=base_currency)
         allocations = AllocationService(database, balances, today=today,
                                         base_currency=base_currency)
         return cls(
@@ -91,16 +98,17 @@ class AppServices:
             ),
             account_transfers=AccountTransferService(database, transactions, today=today),
             budgets=BudgetService(database, today=today, base_currency=base_currency),
-            statements=StatementImportService(database, transactions, today=today),
+            statements=StatementImportService(database, transactions, rules, today=today),
+            category_rules=rules,
             dashboard=DashboardService(database, today=today, base_currency=base_currency),
             statistics=StatisticsService(database, today=today, base_currency=base_currency),
             goals=GoalService(database, today=today, base_currency=base_currency),
             subscriptions=SubscriptionService(
                 database, transactions, today=today, base_currency=base_currency
             ),
-            investments=InvestmentService(
-                database, transactions, today=today, base_currency=base_currency
-            ),
+            investments=investments,
+            net_worth=NetWorthService(database, balances, investments, today=today,
+                                      base_currency=base_currency),
             analysis=analysis,
             ai=AIService(database, analysis, secret_store=secrets, environ=environ),
             settings=settings,

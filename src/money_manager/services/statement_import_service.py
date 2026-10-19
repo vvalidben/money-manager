@@ -6,6 +6,10 @@ income or expenses in one unit of work. Every line is validated like an entry
 typed by hand; a line that cannot be recorded (e.g. dated before the account
 was opened) is reported as a problem and the rest are recorded.
 
+**Categories:** a line whose description matches one of the user's category
+rules (``domain.categorize``) goes to that category; the others go to the
+categories chosen for the import.
+
 **Duplicates:** a line matches an existing transaction of the account with the
 same date, signed amount and description (case and spacing ignored). Matches
 are counted, so two identical coffees in the file and one already recorded
@@ -21,8 +25,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from money_manager.core.errors import ValidationError
+from money_manager.domain.categorize import CategoryRule, match
 from money_manager.domain.entities import TransactionDraft, TransactionFilter
-from money_manager.domain.enums import TransactionType
+from money_manager.domain.enums import CategoryKind, TransactionType
 from money_manager.domain.statement import (
     StatementColumns,
     StatementLine,
@@ -33,6 +38,7 @@ from money_manager.domain.statement import (
 )
 from money_manager.domain.validation import MAX_DESCRIPTION_LENGTH, validate_id
 from money_manager.persistence.database import Database
+from money_manager.services.category_rule_service import CategoryRuleService
 from money_manager.services.transaction_service import TransactionService
 
 logger = logging.getLogger(__name__)
@@ -45,6 +51,7 @@ ENCODINGS = ("utf-8-sig", "cp1252")  # Windows banks often export in cp1252
 class PreviewLine:
     line: StatementLine
     duplicate: bool
+    category_id: int | None = None  # chosen by a rule; None = the import's default
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +67,11 @@ class StatementPreview:
     def duplicate_count(self) -> int:
         return sum(1 for p in self.lines if p.duplicate)
 
+    @property
+    def matched_count(self) -> int:
+        """New lines whose category comes from a rule."""
+        return sum(1 for p in self.lines if not p.duplicate and p.category_id is not None)
+
 
 @dataclass(frozen=True, slots=True)
 class ImportOutcome:
@@ -68,15 +80,23 @@ class ImportOutcome:
     problems: tuple[StatementProblem, ...]
 
 
+def _rule_category(line: StatementLine, rules: Sequence[CategoryRule]) -> int | None:
+    kind = CategoryKind.INCOME if line.amount > 0 else CategoryKind.EXPENSE
+    rule = match(line.description, kind, rules)
+    return None if rule is None else rule.category_id
+
+
 def _key(occurred_on: date, signed: Decimal, description: str) -> tuple[date, Decimal, str]:
     return occurred_on, signed.quantize(Decimal("0.01")), " ".join(description.split()).casefold()
 
 
 class StatementImportService:
-    def __init__(self, database: Database, transactions: TransactionService, *,
+    def __init__(self, database: Database, transactions: TransactionService,
+                 rules: CategoryRuleService, *,
                  today: Callable[[], date] = date.today) -> None:
         self._database = database
         self._transactions = transactions
+        self._rules = rules
         self._today = today
 
     def read(self, path: Path) -> StatementTable:
@@ -106,13 +126,14 @@ class StatementImportService:
         """Every line, marked when it is already recorded in the account."""
         lines, problems = parse_statement(table, columns, date_format)
         recorded = self._recorded(validate_id(account_id, "account_id"), lines)
+        rules = self._rules.rules()
         preview = []
         for line in lines:
             key = _key(line.occurred_on, line.amount, line.description)
             duplicate = recorded[key] > 0
             if duplicate:
                 recorded[key] -= 1
-            preview.append(PreviewLine(line, duplicate))
+            preview.append(PreviewLine(line, duplicate, _rule_category(line, rules)))
         return StatementPreview(tuple(preview), tuple(problems))
 
     def import_lines(self, account_id: int, lines: Sequence[StatementLine], *,
@@ -121,6 +142,7 @@ class StatementImportService:
         """Record the lines not yet in the account; report the ones that cannot be."""
         account_id = validate_id(account_id, "account_id")
         recorded = self._recorded(account_id, lines)
+        rules = self._rules.rules()
         note = f"Imported from {source}" if source else "Imported from a bank statement"
         imported, duplicates = 0, 0
         problems: list[StatementProblem] = []
@@ -132,12 +154,14 @@ class StatementImportService:
                     duplicates += 1
                     continue
                 income = line.amount > 0
+                category_id = _rule_category(line, rules) or (
+                    income_category_id if income else expense_category_id)
                 draft = TransactionDraft(
                     account_id,
                     TransactionType.INCOME if income else TransactionType.EXPENSE,
                     abs(line.amount),
                     line.occurred_on,
-                    income_category_id if income else expense_category_id,
+                    category_id,
                     description=line.description[:MAX_DESCRIPTION_LENGTH],
                     notes=note,
                 )

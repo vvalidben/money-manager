@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QDialog, QFrame, QGridLayout, QScrollArea, QVBoxLa
 
 from money_manager.core.errors import MoneyManagerError
 from money_manager.domain.dashboard import DashboardOverview
+from money_manager.domain.investments import NetWorthPoint
 from money_manager.services import AppServices
 from money_manager.ui import dialogs
 from money_manager.ui.accounts.account_dialog import AccountDialog
@@ -20,9 +21,11 @@ from money_manager.ui.charts.money import (
     BalanceHistoryChart,
     CategorySpendingChart,
     IncomeExpenseChart,
+    NetWorthChart,
     balance_history_table,
     category_spending_table,
     income_expense_table,
+    net_worth_table,
 )
 from money_manager.ui.dashboard.view_model import (
     DashboardView,
@@ -59,12 +62,17 @@ class DashboardPage(BasePage):
         self.view: DashboardView | None = None
         self.renewals: tuple[RenewalView, ...] = ()
         self.transfer_labels: dict[int, TransferSide] = {}
+        self.net_worth: list[NetWorthPoint] = []
 
         self.stat_cards = tuple(StatCard("") for _ in range(4))
         self.flows_card = ChartCard(
             "Income vs expenses", "Last 6 months · adjustments excluded", IncomeExpenseChart()
         )
         self.allocation_card = AllocationOverview()
+        self.net_worth_card = ChartCard(
+            "Net worth", "Balance plus investment values at the end of each month",
+            NetWorthChart(height_px=220),
+        )
         self.balance_card = ChartCard(
             "Balance history", "Total balance at the end of each day", BalanceHistoryChart()
         )
@@ -91,6 +99,7 @@ class DashboardPage(BasePage):
         grid.setVerticalSpacing(Spacing.MD)
         self.stats_row = ResponsiveRow(self.stat_cards, min_item_width=210)
         grid.addWidget(self.stats_row, 0, 0, 1, 12)  # 12-column grid
+        grid.addWidget(self.net_worth_card, 1, 0, 1, 12)
         self.pair_rows = [
             AdaptiveRow([(left, 7), (right, 5)], SIDE_BY_SIDE_MIN_WIDTH)
             for left, right in ((self.flows_card, self.allocation_card),
@@ -98,7 +107,7 @@ class DashboardPage(BasePage):
                                 (self.recent_card, self.health_card),
                                 (self.goals_card, self.renewing_card))
         ]
-        for row, pair in enumerate(self.pair_rows, start=1):
+        for row, pair in enumerate(self.pair_rows, start=2):
             grid.addWidget(pair, row, 0, 1, 12)
         for column in range(12):
             grid.setColumnStretch(column, 1)
@@ -127,7 +136,7 @@ class DashboardPage(BasePage):
         scroll.viewport().setAutoFillBackground(False)
         self.content.setObjectName("TransparentArea")
         self.add_content(scroll, stretch=1)
-        self._grid_widgets = [self.stats_row, self.flows_card, self.allocation_card,
+        self._grid_widgets = [self.stats_row, self.net_worth_card, self.flows_card, self.allocation_card,
                               self.balance_card, self.spending_card, self.recent_card,
                               self.health_card, self.goals_card, self.renewing_card]
 
@@ -140,6 +149,7 @@ class DashboardPage(BasePage):
     def refresh(self) -> None:
         try:
             overview = self._services.dashboard.overview()
+            net_worth = self._services.net_worth.history()
             self.renewals = renewal_views(self._services.subscriptions.upcoming())
             names = {account.id: account.name for account in self._services.accounts.list()}
             self.transfer_labels = transfer_sides(
@@ -149,6 +159,7 @@ class DashboardPage(BasePage):
             dialogs.show_warning(self, "Could not load the dashboard", str(exc))
             return
         self.overview = overview
+        self.net_worth = net_worth
         self.view = build_dashboard_view(overview)
         self._render(overview, self.view)
 
@@ -170,6 +181,8 @@ class DashboardPage(BasePage):
             card.set_value(stat.value, stat.tone)
             card.set_caption(stat.caption)
 
+        self.net_worth_card.chart.render(self.net_worth)
+        self.net_worth_card.set_table(net_worth_table(self.net_worth))
         self.flows_card.chart.render(overview.monthly_flows)
         self.flows_card.set_table(income_expense_table(overview.monthly_flows))
         self.balance_card.chart.render(overview.balance_history)

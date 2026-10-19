@@ -1,10 +1,19 @@
-# Money Manager 1.2.0
+# Money Manager 1.3.0
 
 A local-first personal finance application for Windows. Your data stays in a
 database on your computer; nothing is sent anywhere unless you use online AI
 and confirm each request.
 
-## What's new in 1.2.0
+## What's new in 1.3.0
+
+- **Imports sort themselves.** When you change an imported entry's category,
+  Money Manager remembers it (e.g. *marjane → Groceries*) and puts future lines
+  from the same shop in that category. The import preview shows each line's
+  category. See, add or remove rules in Settings → Category rules.
+- **Net worth over time.** A dashboard chart of your balance plus investment
+  values at the end of each month, for the last 12 months.
+
+## New in 1.2.0
 
 - **Import your bank statement.** Transactions → *Import…* reads the CSV file
   your bank exports, including French statements with *Débit* / *Crédit*

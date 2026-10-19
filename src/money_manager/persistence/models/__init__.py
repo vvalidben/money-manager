@@ -8,6 +8,7 @@ from money_manager.persistence.models.allocation_transfer import AllocationTrans
 from money_manager.persistence.models.app_metadata import AppMetadata
 from money_manager.persistence.models.budget import BudgetModel
 from money_manager.persistence.models.category import CategoryModel
+from money_manager.persistence.models.category_rule import CategoryRuleModel
 from money_manager.persistence.models.goal import GoalModel
 from money_manager.persistence.models.investment import (
     InvestmentEntryModel,
@@ -30,6 +31,7 @@ __all__ = [
     "AppMetadata",
     "BudgetModel",
     "CategoryModel",
+    "CategoryRuleModel",
     "GoalModel",
     "InvestmentEntryModel",
     "InvestmentModel",

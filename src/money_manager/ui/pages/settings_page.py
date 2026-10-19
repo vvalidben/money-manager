@@ -16,6 +16,7 @@ from money_manager.ui.pages.registry import SETTINGS_PAGE_KEY, PageSpec
 from money_manager.ui.settings.cards import (
     AboutCard,
     AppearanceCard,
+    CategoryRulesCard,
     CurrencyCard,
     DataCard,
     PrivacyCard,
@@ -35,6 +36,7 @@ class SettingsPage(BasePage):
         self.storage_card = StorageCard(config)
         self.currency_card = CurrencyCard(services)
         self.appearance_card = AppearanceCard(services)
+        self.rules_card = CategoryRulesCard(services)
         self.ai_card = AISettingsCard(services)
         self.data_card = DataCard(services)
         self.privacy_card = PrivacyCard()
@@ -51,7 +53,8 @@ class SettingsPage(BasePage):
         content_layout.setContentsMargins(0, 0, Spacing.SM, 0)
         content_layout.setSpacing(Spacing.MD)
         for card in (self.storage_card, self.currency_card, self.appearance_card, self.ai_card,
-                     self.data_card, self.privacy_card, self.safety_card, self.reset_card,
+                     self.rules_card, self.data_card, self.privacy_card, self.safety_card,
+                     self.reset_card,
                      self.about_card):
             content_layout.addWidget(card)
         content_layout.addStretch(1)
@@ -66,4 +69,5 @@ class SettingsPage(BasePage):
         self.currency_card.load()
         self.appearance_card.load()
         self.safety_card.load()
+        self.rules_card.load()
         self.ai_card.load()

@@ -36,7 +36,11 @@ from money_manager.domain.statement import (
     guess_columns,
 )
 from money_manager.services import AppServices
-from money_manager.services.statement_import_service import ImportOutcome, StatementPreview
+from money_manager.services.statement_import_service import (
+    ImportOutcome,
+    PreviewLine,
+    StatementPreview,
+)
 from money_manager.ui.components import FormField
 from money_manager.ui.formatting import format_date, format_signed_money
 from money_manager.ui.theme import Spacing
@@ -90,6 +94,8 @@ class ImportStatementDialog(QDialog):
         income_new.setText("New…")
         expense_new.clicked.connect(lambda: self._new_category(CategoryKind.EXPENSE))
         income_new.clicked.connect(lambda: self._new_category(CategoryKind.INCOME))
+        self._category_names = {c.id: c.name for c in
+                                services.categories.list(include_archived=True)}
         self._fill_categories()
 
         self.fields = {
@@ -115,14 +121,15 @@ class ImportStatementDialog(QDialog):
         for column in range(3):
             grid.setColumnStretch(column, 1)
 
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Line", "Date", "Description", "Amount", "Status"])
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["Line", "Date", "Description", "Amount", "Category",
+                                              "Status"])
         self.table.verticalHeader().hide()
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         header_view = self.table.horizontalHeader()
         header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        for column in (0, 1, 3, 4):
+        for column in (0, 1, 3, 4, 5):
             header_view.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         self.summary_label = QLabel()
         self.summary_label.setObjectName("MutedLabel")
@@ -152,7 +159,7 @@ class ImportStatementDialog(QDialog):
         self._apply_guess()
         for combo in (self.account_combo, self.date_combo, self.description_combo,
                       self.amount_combo, self.debit_combo, self.credit_combo, self.mode_combo,
-                      self.format_combo):
+                      self.format_combo, self.expense_combo, self.income_combo):
             combo.currentIndexChanged.connect(self.refresh_preview)
         self.mode_combo.currentIndexChanged.connect(self._show_amount_fields)
         self._show_amount_fields()
@@ -224,6 +231,7 @@ class ImportStatementDialog(QDialog):
         except MoneyManagerError as exc:
             self._error(str(exc))
             return
+        self._category_names[category.id] = category.name
         self._fill_categories((kind, category.id))
 
     # ------------------------------------------------------------ preview
@@ -243,8 +251,9 @@ class ImportStatementDialog(QDialog):
             return
         rows = [(str(p.line.row), format_date(p.line.occurred_on), p.line.description,
                  format_signed_money(Money(p.line.amount, self._services.base_currency)),
-                 "Already recorded" if p.duplicate else "New") for p in self.preview.lines]
-        rows += [(str(p.row), "", "", "", p.message) for p in self.preview.problems]
+                 self._category_text(p), "Already recorded" if p.duplicate else "New")
+                for p in self.preview.lines]
+        rows += [(str(p.row), "", "", "", "", p.message) for p in self.preview.problems]
         rows.sort(key=lambda r: int(r[0]))
         self.table.setRowCount(min(len(rows), PREVIEW_LIMIT))
         for index, row in enumerate(rows[:PREVIEW_LIMIT]):
@@ -258,9 +267,20 @@ class ImportStatementDialog(QDialog):
         self.summary_label.setText(
             f"{new} new · {self.preview.duplicate_count} already recorded · "
             f"{len(self.preview.problems)} cannot be read"
+            + (f" · {self.preview.matched_count} sorted by your category rules"
+               if self.preview.matched_count else "")
             + (f" · showing the first {PREVIEW_LIMIT} lines" if len(rows) > PREVIEW_LIMIT else ""))
         self.import_button.setText(f"Import {new} entr{'y' if new == 1 else 'ies'}")
         self.import_button.setEnabled(new > 0)
+
+    def _category_text(self, line: PreviewLine) -> str:
+        """The rule's category, or the import's default for the line's direction."""
+        if line.duplicate:
+            return ""
+        if line.category_id is not None:
+            return self._category_names.get(line.category_id, "?")
+        default = self.income_combo if line.line.amount > 0 else self.expense_combo
+        return f"{default.currentText()} (default)" if default.currentText() else "—"
 
     def _error(self, message: str) -> None:
         self.form_error.setText(message)

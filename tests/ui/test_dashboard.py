@@ -264,6 +264,24 @@ class TestPage:
         assert len(page.spending_card.chart.hover_texts) == 2
         assert [r.label for r in page.health_card.rows][0] == "Savings rate"
 
+    def test_net_worth_by_month(self, page: DashboardPage, app_services: AppServices,
+                                populated: None) -> None:
+        etf = app_services.investments.create("ETF", "etf")
+        app_services.investments.set_value(etf.investment.id, "5000", date(2026, 5, 20))
+        page.refresh()
+
+        assert [p.month.month for p in page.net_worth] == [1, 2, 3, 4, 5, 6]
+        chart = page.net_worth_card.chart
+        chart.draw()
+        x, y = chart.axes.transData.transform((4.2, 30000))
+        assert chart.hover_text(MouseEvent("motion_notify_event", chart, x, y)) == (
+            "May 2026 · 31 May 2026\nNet worth: 34,620.00 MAD\n"
+            "Balance: 29,620.00 MAD\nInvestments: 5,000.00 MAD")
+        page.net_worth_card.toggle_button.click()
+        table = page.net_worth_card.table
+        assert [table.item(5, c).text() for c in range(4)] == [
+            "Jun 2026", "34,200.00 MAD", "5,000.00 MAD", "39,200.00 MAD"]
+
     def test_table_toggle(self, page: DashboardPage, populated: None) -> None:
         page.on_shown()
 

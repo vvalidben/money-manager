@@ -238,3 +238,33 @@ def test_window_is_rebuilt_with_the_new_currency(qapp: QApplication, app_config:
     assert not first.isVisible() and second.isVisible()
     second.close()
     second.deleteLater()
+
+
+class TestCategoryRules:
+    def test_add_and_remove(self, page: SettingsPage, app_services: AppServices,
+                            monkeypatch: pytest.MonkeyPatch) -> None:
+        card = page.rules_card
+        assert card.empty_label.isVisibleTo(page) and not card.remove_button.isEnabled()
+        app_services.categories.create("Groceries", CategoryKind.EXPENSE)
+        monkeypatch.setattr(cards.QInputDialog, "getText",
+                            lambda *_a, **_k: ("Carrefour", True))
+        monkeypatch.setattr(cards.QInputDialog, "getItem",
+                            lambda _p, _t, _l, items, *_a, **_k: (items[0], True))
+        card.add_button.click()
+        assert [card.list.item(r).text() for r in range(card.list.count())] == [
+            "“carrefour” → Groceries  (spending)"]
+
+        card.list.setCurrentRow(0)
+        assert card.remove_button.isEnabled()
+        card.remove_button.click()
+        assert app_services.category_rules.entries() == []
+        assert card.empty_label.isVisibleTo(page)
+
+    def test_a_bad_keyword_is_explained(self, page: SettingsPage, app_services: AppServices,
+                                        monkeypatch: pytest.MonkeyPatch) -> None:
+        app_services.categories.create("Groceries", CategoryKind.EXPENSE)
+        monkeypatch.setattr(cards.QInputDialog, "getText", lambda *_a, **_k: ("x", True))
+        monkeypatch.setattr(cards.QInputDialog, "getItem",
+                            lambda _p, _t, _l, items, *_a, **_k: (items[0], True))
+        page.rules_card.add_button.click()
+        assert "keyword" in page.rules_card.status_label.text()

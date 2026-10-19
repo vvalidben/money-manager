@@ -160,6 +160,37 @@ class TestCrud:
         assert page.balance_card.value == "9,879.60 MAD"
         assert page.model.row_at(0).amount == "−120.40 MAD"
 
+    def test_changing_the_category_learns_a_rule(
+        self, page: TransactionsPage, record, food: Category, app_services: AppServices,
+        monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fuel = app_services.categories.create("Fuel", CategoryKind.EXPENSE)
+        record(TransactionType.EXPENSE, "300", food, description="CB AFRIQUIA 12/10")
+        page.reload()
+        notices: list[tuple[str, str]] = []
+        page.notice.connect(lambda title, detail: notices.append((title, detail)))
+
+        _patch_dialog(monkeypatch, lambda d: d.category_combo.setCurrentIndex(
+            d.category_combo.findData(fuel.id)))
+        _select_row(page, 0)
+        page.edit_button.click()
+
+        assert notices == [("Entry updated · rule learned",
+                            "“afriquia” goes to Fuel from now on")]
+        assert app_services.category_rules.category_for("CB AFRIQUIA RABAT",
+                                                        CategoryKind.EXPENSE) == fuel.id
+
+    def test_editing_without_a_new_category_learns_nothing(
+        self, page: TransactionsPage, record, food: Category, app_services: AppServices,
+        monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        record(TransactionType.EXPENSE, "300", food, description="CB AFRIQUIA")
+        page.reload()
+        _patch_dialog(monkeypatch, lambda d: d.amount_edit.setText("200"))
+        _select_row(page, 0)
+        page.edit_button.click()
+        assert app_services.category_rules.entries() == []
+
     def test_double_click_edits(
         self, page: TransactionsPage, record, food: Category, monkeypatch: pytest.MonkeyPatch
     ) -> None:

@@ -59,8 +59,20 @@ def test_dialog_detects_columns_and_previews(qapp: QApplication, app_services: A
     assert dialog.format_combo.currentData() == "%d/%m/%Y"
     assert dialog.summary_label.text() == "2 new · 0 already recorded · 1 cannot be read"
     assert dialog.import_button.text() == "Import 2 entries"
-    statuses = [dialog.table.item(r, 4).text() for r in range(dialog.table.rowCount())]
+    statuses = [dialog.table.item(r, 5).text() for r in range(dialog.table.rowCount())]
     assert statuses == ["New", "New", "'oops' is not a date."]
+    categories = [dialog.table.item(r, 4).text() for r in range(dialog.table.rowCount())]
+    assert categories == ["Groceries (default)", "Salary (default)", ""]
+    dialog.deleteLater()
+
+
+def test_rules_show_in_the_preview(qapp: QApplication, app_services: AppServices,
+                                   bank: Account, statement: Path) -> None:
+    household = app_services.categories.create("Household", CategoryKind.EXPENSE)
+    app_services.category_rules.learn("CB MARJANE", household.id)
+    dialog = ImportStatementDialog(app_services, statement, app_services.statements.read(statement))
+    assert dialog.table.item(0, 4).text() == "Household"
+    assert dialog.summary_label.text().endswith("1 sorted by your category rules")
     dialog.deleteLater()
 
 

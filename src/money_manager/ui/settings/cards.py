@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -22,8 +23,10 @@ from PySide6.QtWidgets import (
 
 from money_manager.core.config import AppConfig
 from money_manager.core.errors import MoneyManagerError
+from money_manager.domain.enums import CategoryKind
 from money_manager.domain.money import DEFAULT_CURRENCY
 from money_manager.services import AppServices
+from money_manager.services.category_rule_service import RuleEntry
 from money_manager.services.data_service import SafetyCopy
 from money_manager.ui import dialogs, motion
 from money_manager.ui.components import Card, FlowRow, compact_combo
@@ -486,3 +489,88 @@ def safety_copy_text(copy: SafetyCopy) -> str:
                         f"{'' if copy.transactions == 1 else 's'}")
         contents = f"{accounts}, {transactions}"
     return f"{copy.reason_text} \u00b7 {_when(copy)} \u00b7 {contents}"
+
+
+class CategoryRulesCard(Card):
+    """Keywords that put matching descriptions in a category (used by imports)."""
+
+    def __init__(self, services: AppServices, parent: QWidget | None = None) -> None:
+        super().__init__("Category rules", parent)
+        self._services = services
+        self.body.addWidget(_text(
+            "When a bank statement is imported, a line whose description contains a keyword "
+            "goes to that keyword's category. Rules are learned when you change an entry's "
+            "category; you can also add them here."))
+        self.list = QListWidget()
+        self.list.setAccessibleName("Category rules")
+        self.list.setMinimumHeight(110)
+        self.list.setMaximumHeight(220)
+        self.list.currentRowChanged.connect(lambda _row: self._update_buttons())
+        self.body.addWidget(self.list)
+        self.empty_label = _text("No rules yet.", "MutedLabel")
+        self.body.addWidget(self.empty_label)
+        self.add_button = QPushButton("Add rule\u2026")
+        self.add_button.clicked.connect(self.add_rule)
+        self.remove_button = QPushButton("Remove")
+        self.remove_button.setObjectName("DangerButton")
+        self.remove_button.clicked.connect(self.remove_rule)
+        row = QHBoxLayout()
+        row.addWidget(self.add_button)
+        row.addWidget(self.remove_button)
+        row.addStretch(1)
+        self.body.addLayout(row)
+        self.status_label = _status_label()
+        self.body.addWidget(self.status_label)
+        self.entries: list[RuleEntry] = []
+        self.load()
+
+    def load(self) -> None:
+        try:
+            self.entries = self._services.category_rules.entries()
+        except MoneyManagerError as exc:
+            self.entries = []
+            _set_status(self.status_label, str(exc), error=True)
+        self.list.clear()
+        for entry in self.entries:
+            kind = "income" if entry.rule.kind is CategoryKind.INCOME else "spending"
+            self.list.addItem(f"\u201c{entry.rule.keyword}\u201d \u2192 {entry.category_name}"
+                              f"  ({kind})")
+        self.list.setVisible(bool(self.entries))
+        self.empty_label.setVisible(not self.entries)
+        self._update_buttons()
+
+    def _update_buttons(self) -> None:
+        self.remove_button.setEnabled(0 <= self.list.currentRow() < len(self.entries))
+
+    def add_rule(self) -> None:
+        categories = self._services.categories.list()
+        if not categories:
+            _set_status(self.status_label, "Create a category first.", error=True)
+            return
+        labels = [f"{c.name} ({'income' if c.kind is CategoryKind.INCOME else 'spending'})"
+                  for c in categories]
+        keyword, ok = QInputDialog.getText(self, "Add rule", "Keyword in the description:")
+        if not ok or not keyword.strip():
+            return
+        label, ok = QInputDialog.getItem(self, "Add rule", "Category:", labels, 0, False)
+        if not ok:
+            return
+        category = categories[labels.index(label)]
+        try:
+            self._services.category_rules.add(keyword, category.id)
+        except MoneyManagerError as exc:
+            _set_status(self.status_label, str(exc), error=True)
+            return
+        _set_status(self.status_label, "")
+        self.load()
+
+    def remove_rule(self) -> None:
+        row = self.list.currentRow()
+        if not 0 <= row < len(self.entries):
+            return
+        try:
+            self._services.category_rules.remove(self.entries[row].rule.id)
+        except MoneyManagerError as exc:
+            _set_status(self.status_label, str(exc), error=True)
+            return
+        self.load()

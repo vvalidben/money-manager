@@ -19,6 +19,7 @@ Rules
 """
 
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -202,3 +203,21 @@ class PortfolioSummary:
                 for kind, value in totals.items()]
         rows.sort(key=lambda r: (-r.value.minor_units, r.kind.value))
         return tuple(rows)
+
+
+def value_on(valuations: Sequence[Valuation], day: date) -> Money | None:
+    """The latest value entered on or before ``day`` (None: not valued yet)."""
+    known = [v for v in valuations if v.valued_on <= day]
+    return None if not known else max(known, key=lambda v: (v.valued_on, v.id)).value
+
+
+@dataclass(frozen=True, slots=True)
+class NetWorthPoint:
+    month: date  # first day of the month
+    on: date  # the day measured: the month's last day, or today for the current month
+    balance: Money  # all accounts
+    investments: Money  # latest known values of the active investments on that day
+
+    @property
+    def net_worth(self) -> Money:
+        return self.balance + self.investments

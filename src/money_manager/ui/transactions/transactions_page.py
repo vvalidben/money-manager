@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from money_manager.core.errors import MoneyManagerError
+from money_manager.domain.categorize import CategoryRule
 from money_manager.domain.entities import (
     Allocation,
     Category,
@@ -232,8 +233,15 @@ class TransactionsPage(BasePage):
             return
         dialog = self.make_transaction_dialog(transaction)
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved is not None:
-            self._after_change(dialog.saved.id)
-            self._announce("Entry updated", dialog.saved.id)
+            saved = dialog.saved
+            self._after_change(saved.id)
+            rule = self._learn_rule(transaction, saved)
+            if rule is None:
+                self._announce("Entry updated", saved.id)
+            else:
+                name = next((c.name for c in self._categories if c.id == rule.category_id), "?")
+                self.notice.emit("Entry updated · rule learned",
+                                 f"\u201c{rule.keyword}\u201d goes to {name} from now on")
 
     def delete_selected(self) -> None:
         transaction = self.selected_transaction()
@@ -256,6 +264,16 @@ class TransactionsPage(BasePage):
             return
         self._after_change(None)
         self.notice.emit("Entry deleted", f"{row.amount} · {row.description}")
+
+    def _learn_rule(self, before: Transaction, after: Transaction) -> CategoryRule | None:
+        """A corrected category teaches a rule for future imports (and stays a rule)."""
+        if after.category_id is None or after.category_id == before.category_id:
+            return None
+        try:
+            return self._services.category_rules.learn(after.description, after.category_id)
+        except MoneyManagerError as exc:
+            logger.warning("Could not learn a category rule: %s", exc)
+            return None
 
     def _announce(self, title: str, transaction_id: int) -> None:
         """Confirm a change with the entry as the list shows it (if it is in view)."""

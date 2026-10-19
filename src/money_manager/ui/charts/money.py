@@ -8,9 +8,11 @@ from matplotlib.dates import AutoDateLocator, ConciseDateFormatter, date2num
 
 from money_manager.domain.analytics import BalancePoint
 from money_manager.domain.dashboard import CategorySpending, MonthlyFlow
+from money_manager.domain.investments import NetWorthPoint
 from money_manager.ui.charts.base import (
     AXIS_COLOR,
     BALANCE_COLOR,
+    CATEGORICAL,
     EXPENSE_COLOR,
     GRID_COLOR,
     INCOME_COLOR,
@@ -116,6 +118,66 @@ class BalanceHistoryChart(ChartCanvas):
         return f"{format_date(point.day)}\n{format_money(point.balance)}"
 
 
+INVESTMENTS_COLOR = CATEGORICAL[1]  # violet next to the lime net-worth line
+
+
+class NetWorthChart(ChartCanvas):
+    """Net worth at each month end; with investments, the balance line below it and
+    the band between them is what the investments add."""
+
+    def __init__(self, height_px: int = 240) -> None:
+        super().__init__(height_px)
+        self._points: list[NetWorthPoint] = []
+
+    def render(self, points: Sequence[NetWorthPoint]) -> None:
+        self._points = []
+        if len(points) < 2:
+            self.show_message("Your net worth over time appears after your first month")
+            return
+        self.reset()
+        ax = self.axes
+        xs = list(range(len(points)))
+        worth = [plot_value(p.net_worth) for p in points]
+        has_investments = any(not p.investments.is_zero() for p in points)
+        if has_investments:
+            balance = [plot_value(p.balance) for p in points]
+            ax.fill_between(xs, balance, worth, color=INVESTMENTS_COLOR, alpha=0.28, linewidth=0,
+                            label="Investments")
+            ax.plot(xs, balance, color=INVESTMENTS_COLOR, linewidth=1.5, label="Balance")
+        ax.plot(xs, worth, color=BALANCE_COLOR, linewidth=2, marker="o", markersize=4,
+                solid_joinstyle="round", solid_capstyle="round", label="Net worth")
+        if min(worth) < 0 < max(worth):
+            ax.axhline(0, color=AXIS_COLOR, linewidth=1)
+        ax.plot([xs[-1]], [worth[-1]], marker="o", markersize=8, color=BALANCE_COLOR,
+                markeredgecolor=SURFACE, markeredgewidth=2, zorder=3)
+        ax.annotate(format_money(points[-1].net_worth), (xs[-1], worth[-1]), xytext=(-8, 10),
+                    textcoords="offset points", ha="right", color=INK_SECONDARY, zorder=4,
+                    bbox={"boxstyle": "round,pad=0.25", "facecolor": SURFACE, "edgecolor": "none"})
+        ax.set_xticks(xs)
+        ax.set_xticklabels([month_abbreviation(p.month) for p in points])
+        ax.set_xlim(-0.3, xs[-1] + 0.3)
+        money_axis(ax.yaxis)
+        if has_investments:
+            ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), frameon=False, ncols=3,
+                      handlelength=1.4, borderaxespad=0.2)
+        self._points = list(points)
+        self.draw_idle()
+
+    def hover_text(self, event: MouseEvent) -> str | None:
+        """Anywhere over the plot: the nearest month's figures."""
+        if event.inaxes is not self.axes or event.xdata is None or not self._points:
+            return None
+        return net_worth_text(self._points[min(max(round(event.xdata), 0),
+                                                len(self._points) - 1)])
+
+
+def net_worth_text(point: NetWorthPoint) -> str:
+    return (f"{format_month(point.month)} · {format_date(point.on)}\n"
+            f"Net worth: {format_money(point.net_worth)}\n"
+            f"Balance: {format_money(point.balance)}\n"
+            f"Investments: {format_money(point.investments)}")
+
+
 class CategorySpendingChart(ChartCanvas):
     """Horizontal bars, largest first; one series, one colour, value at the tip."""
 
@@ -168,6 +230,14 @@ def balance_history_table(points: Sequence[BalancePoint]) -> TableData:
         if index == len(points) - 1 or points[index + 1].day.month != p.day.month
     ]
     return ["Date", "Balance"], rows
+
+
+def net_worth_table(points: Sequence[NetWorthPoint]) -> TableData:
+    return (
+        ["Month", "Balance", "Investments", "Net worth"],
+        [[format_month(p.month), format_money(p.balance), format_money(p.investments),
+          format_money(p.net_worth)] for p in points],
+    )
 
 
 def category_spending_table(rows: Sequence[CategorySpending]) -> TableData:
