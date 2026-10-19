@@ -8,7 +8,7 @@ from money_manager.core.errors import NotFoundError, ValidationError
 from money_manager.domain.budgets import Budget, BudgetStatus, BudgetSummary
 from money_manager.domain.enums import CategoryKind
 from money_manager.domain.money import DEFAULT_CURRENCY, AmountInput, Money
-from money_manager.domain.periods import month_start
+from money_manager.domain.periods import month_end, month_start
 from money_manager.domain.validation import positive_amount, validate_id
 from money_manager.persistence.database import Database
 from money_manager.persistence.models import BudgetModel
@@ -24,9 +24,11 @@ class BudgetService:
         self._today = today
         self._currency = base_currency
 
-    def overview(self) -> BudgetSummary:
-        """Every budget with this month's spending so far, most used first."""
+    def overview(self, month: date | None = None) -> BudgetSummary:
+        """Every budget with the month's spending (this month: so far), most used first."""
         today = self._today()
+        if month is not None and month_start(month) < month_start(today):
+            today = month_end(month)  # a past month, measured on its last day
         with self._database.session() as session:
             budgets = BudgetRepository(session)
             models = budgets.list()

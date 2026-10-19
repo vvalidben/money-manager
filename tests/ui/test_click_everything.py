@@ -39,6 +39,7 @@ def slot_errors(monkeypatch: pytest.MonkeyPatch) -> list[BaseException]:
     monkeypatch.setattr(sys, "excepthook", lambda kind, value, tb: errors.append(value))
     monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Rejected)
     monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *args, **kw: ("", False)))
+    monkeypatch.setattr(QInputDialog, "getItem", staticmethod(lambda *args, **kw: ("", False)))
     for name in ("show_error", "show_warning", "show_info"):
         monkeypatch.setattr(dialogs, name, lambda *args: None)
     monkeypatch.setattr(dialogs, "ask_save_path", lambda *args: None)

@@ -81,6 +81,9 @@ def everything(services: AppServices, monkeypatch: pytest.MonkeyPatch) -> AppSer
                                description="Cash for the market")
     s.budgets.set(food.id, "1800")
     s.category_rules.learn("CB MARJANE", food.id)
+    s.recurring.create("Rent", type="expense", amount="3000", account_id=bank.id,
+                       category_id=food.id, frequency="monthly",
+                       first_date=date(2026, 7, 5))
     s.goals.create_with_new_allocation("Car", target="50000", deadline=date(2027, 6, 1),
                                        initial_amount="500")
     s.goals.create_manual("Gift", target="800", current="200")

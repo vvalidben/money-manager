@@ -77,9 +77,11 @@ class StatisticsService:
         self._validate(period)
         return period
 
-    def report(self, period: DateRange) -> StatisticsReport:
+    def report(self, period: DateRange, previous: DateRange | None = None) -> StatisticsReport:
+        """Figures for ``period``, compared with ``previous`` (default: the equally long
+        range just before it)."""
         self._validate(period)
-        previous = previous_range(period)
+        previous = previous_range(period) if previous is None else previous
         first_month = month_start(period.start)
         # Also load the month before the first month (month-over-month baseline).
         window_start = min(previous.start, add_months(first_month, -1))

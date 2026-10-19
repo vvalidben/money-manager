@@ -15,7 +15,7 @@ import logging
 import sys
 import time
 import traceback
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -25,6 +25,7 @@ from PySide6.QtWidgets import QApplication
 from money_manager import APP_NAME, __version__
 from money_manager.ai.secrets import MemorySecretStore
 from money_manager.ai.settings import AIMode, AISettings
+from money_manager.core.cli import SELF_TEST_FLAG, self_test_folder  # noqa: F401 - re-exported
 from money_manager.core.config import AppConfig
 from money_manager.core.resources import is_frozen, resource_path
 from money_manager.domain.entities import TransactionDraft
@@ -40,19 +41,7 @@ from money_manager.ui.pages import PAGES
 
 logger = logging.getLogger(__name__)
 
-SELF_TEST_FLAG = "--self-test"
 EXPECTED_BALANCE = Money.of("4700")  # 1,000 opening + 5,000 income − 1,200 − 100 expenses
-
-
-def self_test_folder(argv: Sequence[str]) -> Path | None:
-    """The folder given after ``--self-test``, if the flag is present."""
-    arguments = list(argv)
-    if SELF_TEST_FLAG not in arguments:
-        return None
-    index = arguments.index(SELF_TEST_FLAG)
-    if index + 1 >= len(arguments):
-        raise SystemExit(f"{SELF_TEST_FLAG} needs a folder")
-    return Path(arguments[index + 1]).resolve()
 
 
 class SelfTest:

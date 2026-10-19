@@ -41,6 +41,7 @@ from money_manager.ui.components import ResponsiveRow, EmptyState, StatCard
 from money_manager.ui.formatting import format_date, format_money, format_signed_money
 from money_manager.ui.pages.base_page import BasePage
 from money_manager.ui.pages.registry import PageSpec
+from money_manager.ui.recurring.recurring_dialog import RecurringDialog
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import FilterBar
 from money_manager.ui.transactions.rows import TransactionRow, build_rows, transfer_sides
@@ -94,6 +95,11 @@ class TransactionsPage(BasePage):
         self.import_button.setToolTip("Import a bank statement (CSV file)")
         self.import_button.clicked.connect(self.import_statement)
         self.header.add_action(self.import_button)
+        self.recurring_button = QPushButton("Recurring…")
+        self.recurring_button.setToolTip(
+            "Income and expenses recorded automatically, e.g. salary or rent")
+        self.recurring_button.clicked.connect(self.manage_recurring)
+        self.header.add_action(self.recurring_button)
         self._account_names: dict[int, str] = {}
 
         # Table
@@ -316,6 +322,15 @@ class TransactionsPage(BasePage):
             route = (f"{self._account_names.get(transfer.from_account_id, '?')} → "
                      f"{self._account_names.get(transfer.to_account_id, '?')}")
             self.notice.emit("Transfer recorded", f"{format_money(transfer.amount)} · {route}")
+
+    def manage_recurring(self) -> None:
+        dialog = self.make_recurring_dialog()
+        dialog.exec()
+        if dialog.changed:
+            self.reload()
+
+    def make_recurring_dialog(self) -> RecurringDialog:
+        return RecurringDialog(self._services, parent=self)
 
     def import_statement(self) -> None:
         path = self.ask_statement_path()

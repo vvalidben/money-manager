@@ -111,6 +111,42 @@ def package(release_version: str) -> Path:
     return archive
 
 
+def installer(release_version: str, archive: Path) -> Path:
+    """MoneyManager-<version>-Setup.exe, with the release zip as its payload."""
+    step("Building the installer")
+    work = BUILD / "installer"
+    work.mkdir(parents=True, exist_ok=True)
+    version_file = work / "version.txt"
+    version_file.write_text(release_version, encoding="utf-8")
+    payload = work / "MoneyManager.zip"
+    shutil.copy2(archive, payload)
+    environment = {**os.environ, "MM_PAYLOAD": str(payload), "MM_VERSION_FILE": str(version_file)}
+    subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean",
+                    "--distpath", str(work / "dist"), "--workpath", str(work / "build"),
+                    str(PACKAGING / "installer" / "Setup.spec")],
+                   check=True, cwd=ROOT, env=environment)
+    built = work / "dist" / f"MoneyManager-{release_version}-Setup.exe"
+    if not built.is_file():
+        raise SystemExit(f"PyInstaller did not produce {built}")
+    setup = RELEASE / built.name
+    shutil.copy2(built, setup)
+
+    step("Checking the installer (quiet install into a temporary folder)")
+    target = Path(tempfile.mkdtemp(prefix="moneymanager-setup-")) / "MoneyManager"
+    result = subprocess.run([str(setup), "--quiet", "--no-shortcuts", "--target", str(target)],
+                            timeout=600, check=False)
+    manifest = target / "install-manifest.json"
+    expected = (target / "MoneyManager.exe", manifest, target / "uninstall.ps1")
+    if result.returncode != 0 or not all(path.is_file() for path in expected):
+        raise SystemExit(f"The installer check failed (exit {result.returncode}); see {target}")
+    print(f"   installed {sum(1 for p in target.rglob('*') if p.is_file())} files into {target}")
+    shutil.rmtree(target.parent, ignore_errors=True)
+    digest = hashlib.sha256(setup.read_bytes()).hexdigest()
+    setup.with_name(setup.name + ".sha256").write_text(f"{digest}  {setup.name}\n",
+                                                       encoding="utf-8")
+    return setup
+
+
 def folder_size(folder: Path) -> int:
     return sum(p.stat().st_size for p in folder.rglob("*") if p.is_file())
 
@@ -129,11 +165,13 @@ def main() -> None:
     if not arguments.skip_self_test:
         self_test()
     archive = package(release_version)
+    setup = installer(release_version, archive)
     step("Done")
     print(f"   version     {release_version}")
     print(f"   executable  {EXE}")
     print(f"   folder      {folder_size(APP_DIR) / 1e6:.0f} MB")
     print(f"   archive     {archive} ({archive.stat().st_size / 1e6:.0f} MB)")
+    print(f"   installer   {setup} ({setup.stat().st_size / 1e6:.0f} MB)")
 
 
 if __name__ == "__main__":

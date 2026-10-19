@@ -36,10 +36,13 @@ class NetWorthService:
         self._today = today
         self._currency = base_currency
 
-    def history(self, months: int = NET_WORTH_MONTHS) -> list[NetWorthPoint]:
+    def history(self, months: int = NET_WORTH_MONTHS, *,
+                until: date | None = None) -> list[NetWorthPoint]:
         """One point per month, oldest first, from the first account's month (at most
-        ``months`` of them, ending with the current month)."""
+        ``months`` of them, ending with the current month or ``until``'s month)."""
         today = self._today()
+        if until is not None and month_start(until) < month_start(today):
+            today = month_end(until)
         with self._database.session() as session:
             openings = [m.opening_date for m in AccountRepository(session).list_all()]
         if not openings:

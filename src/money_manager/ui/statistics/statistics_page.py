@@ -9,14 +9,18 @@ older one. The range selector sits above everything it scopes.
 """
 
 import logging
+from datetime import date
 from functools import partial
+from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QStandardPaths, Qt, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QPushButton,
     QScrollArea,
@@ -51,8 +55,10 @@ from money_manager.ui.charts.money import (
 from money_manager.ui.components import AdaptiveRow, EmptyState, ResponsiveRow, StatCard
 from money_manager.ui.components.data_table_card import DataTableCard
 from money_manager.ui.components.facts_card import FactsCard
+from money_manager.ui.formatting import format_month
 from money_manager.ui.pages.base_page import BasePage
 from money_manager.ui.pages.registry import PageSpec
+from money_manager.ui.reports.monthly_pdf import write_monthly_report
 from money_manager.ui.statistics.investment_dialog import InvestmentCategoriesDialog
 from money_manager.ui.statistics.range_bar import RangeBar
 from money_manager.ui.statistics.view_model import (
@@ -81,6 +87,10 @@ class StatisticsPage(BasePage):
         self.range_bar.changed.connect(self.refresh)
         self.investments_button = QPushButton("Investment categories…")
         self.investments_button.clicked.connect(self.edit_investment_categories)
+        self.report_button = QPushButton("Monthly report…")
+        self.report_button.setToolTip("Save a month's summary as a PDF you can print or keep")
+        self.report_button.clicked.connect(self.save_report)
+        self.header.add_action(self.report_button)
         self.range_error = QLabel()
         self.range_error.setObjectName("FieldError")
         self.range_error.hide()
@@ -249,6 +259,51 @@ class StatisticsPage(BasePage):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.refresh()
 
+    def save_report(self) -> Path | None:
+        """Ask for a month and a file, write the PDF and open it."""
+        try:
+            months = self._services.reports.months()
+        except MoneyManagerError as exc:
+            dialogs.show_warning(self, "Could not prepare the report", str(exc))
+            return None
+        if not months:
+            dialogs.show_info(self, "Monthly report",
+                              "Create an account first; the report covers its months.")
+            return None
+        month = self.ask_report_month(months)
+        if month is None:
+            return None
+        path = self.ask_report_path(default_report_path(month))
+        if path is None:
+            return None
+        try:
+            write_monthly_report(self._services.reports.monthly(month), path)
+        except (MoneyManagerError, OSError) as exc:
+            logger.warning("Could not save the monthly report: %s", exc)
+            dialogs.show_warning(self, "Could not save the report", str(exc))
+            return None
+        logger.info("Monthly report saved")
+        self.notice.emit("Report saved", path.name)
+        self.open_report(path)
+        return path
+
+    def ask_report_month(self, months: list[date]) -> date | None:
+        today = self._services.today()
+        labels = [format_month(m) + (" (to date)" if (m.year, m.month) == (today.year, today.month)
+                                     else "") for m in months]
+        default = 1 if len(months) > 1 else 0  # the last complete month
+        label, ok = QInputDialog.getItem(self, "Monthly report", "Month:", labels, default, False)
+        return months[labels.index(label)] if ok else None
+
+    def ask_report_path(self, suggested: Path) -> Path | None:
+        path = dialogs.ask_save_path(self, "Save the monthly report", suggested, "PDF (*.pdf)")
+        if path is not None and path.suffix.lower() != ".pdf":
+            path = path.with_name(path.name + ".pdf")
+        return path
+
+    def open_report(self, path: Path) -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
     def create_account(self) -> None:
         dialog = AccountDialog(self._services, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -294,3 +349,10 @@ class StatisticsPage(BasePage):
         self.months_card.set_rows(MONTH_HEADERS, view.month_rows)
         self.recurring_card.subtitle_label.setText(view.recurring_caption)
         self.recurring_card.set_rows(RECURRING_HEADERS, view.recurring_rows, text_columns=3)
+
+
+def default_report_path(month: date) -> Path:
+    """``Money Manager 2026-09.pdf`` in the Documents folder."""
+    location = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
+    folder = Path(location) if location else Path.home()
+    return folder / f"Money Manager {month:%Y-%m}.pdf"

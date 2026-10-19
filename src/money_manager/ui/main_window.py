@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
 
 from money_manager import APP_NAME
 from money_manager.core.config import AppConfig
+from money_manager.core.errors import MoneyManagerError
+from money_manager.domain.recurring import RecordOutcome
 from money_manager.services import AppServices
 from money_manager.ui.accounts.accounts_page import AccountsPage
 from money_manager.ui.advisor.advisor_page import AdvisorPage
@@ -27,6 +29,7 @@ from money_manager.ui.components.toast import Toast
 from money_manager.ui.dashboard.dashboard_page import DashboardPage
 from money_manager.ui.goals.goals_page import GoalsPage
 from money_manager.ui.investments.investments_page import InvestmentsPage
+from money_manager.ui.lock.app_lock import AppLock
 from money_manager.ui.navigation import (
     ICON_PATHS,
     PLUS_PATH,
@@ -64,6 +67,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_WINDOW_SIZE = QSize(1200, 760)
 MINIMUM_WINDOW_SIZE = QSize(960, 600)
+RECURRING_CHECK_MS = 60 * 60 * 1000  # recurring entries due are recorded hourly
 
 
 class MainWindow(QMainWindow):
@@ -72,7 +76,8 @@ class MainWindow(QMainWindow):
     reload_requested = Signal(str)
 
     def __init__(
-        self, config: AppConfig, services: AppServices, parent: QWidget | None = None
+        self, config: AppConfig, services: AppServices, parent: QWidget | None = None, *,
+        start_locked: bool = False,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(APP_NAME)
@@ -87,6 +92,7 @@ class MainWindow(QMainWindow):
             page.notice.connect(self._show_notice)
             if isinstance(page, SettingsPage):
                 page.reload_requested.connect(self.reload_requested)
+                settings_page = page
             self._pages[spec.key] = page
             self._stack.addWidget(page)
 
@@ -122,13 +128,66 @@ class MainWindow(QMainWindow):
         self._controls_host: BasePage | None = None
         self._install_shortcuts()
 
+        # Last, so the lock screen lies above the rail and the notices.
+        self.app_lock = AppLock(central, services.settings)
+        self.app_lock.locked_changed.connect(self._set_shortcuts_paused)
+        self._paused_shortcuts: list[QShortcut] = []
+        settings_page.lock_requested.connect(self.lock)
+        settings_page.lock_settings_changed.connect(self.app_lock.configure)
+        QShortcut(QKeySequence("Ctrl+L"), self, self.lock)
+
         self.show_page(DEFAULT_PAGE_KEY)
+        if start_locked:
+            self.app_lock.lock(prompt=True)
+
+        # Recurring entries: dates that have come are recorded once the window is up,
+        # then every hour while it stays open (e.g. across midnight).
+        self._services = services
+        self.recurring_timer = QTimer(self)
+        self.recurring_timer.setInterval(RECURRING_CHECK_MS)
+        self.recurring_timer.timeout.connect(self.record_recurring)
+        self.recurring_timer.start()
+        QTimer.singleShot(0, self.record_recurring)
+
+    def lock(self) -> None:
+        self.app_lock.lock()
+
+    def record_recurring(self) -> RecordOutcome | None:
+        try:
+            outcome = self._services.recurring.record_due()
+        except MoneyManagerError as exc:
+            logger.warning("Could not record recurring entries: %s", exc)
+            return None
+        if outcome.recorded:
+            count = outcome.recorded
+            self._show_notice(f"{count} recurring {'entry' if count == 1 else 'entries'} "
+                              "recorded", "Transactions → Recurring…")
+        elif outcome.problems:
+            problem = outcome.problems[0]
+            self._show_notice("A recurring entry could not be recorded",
+                              f"{problem.description}: {problem.message}")
+        if outcome.recorded:
+            self.current_page.force_refresh()
+        return outcome
+
+    def _set_shortcuts_paused(self, locked: bool) -> None:
+        """No shortcut reaches the pages under the lock screen."""
+        if locked:
+            self._paused_shortcuts = [s for s in self.findChildren(QShortcut) if s.isEnabled()]
+            for shortcut in self._paused_shortcuts:
+                shortcut.setEnabled(False)
+        else:
+            for shortcut in self._paused_shortcuts:
+                shortcut.setEnabled(True)
+            self._paused_shortcuts = []
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802
         if watched is self.centralWidget() and event.type() == QEvent.Type.Resize:
             self._sidebar.place(self.centralWidget().height())
             if self.toast.isVisible():
                 self.toast.move(self.toast._resting_position())
+            if hasattr(self, "app_lock"):
+                self.app_lock.place()
         return super().eventFilter(watched, event)
 
     # ------------------------------------------------------------ global controls

@@ -3,3 +3,7 @@ PySide6>=6.7
 SQLAlchemy>=2.0
 matplotlib>=3.8
 alembic>=1.13
+# Windows Hello for the app lock.
+winrt-runtime>=3.2; sys_platform == "win32"
+winrt-Windows.Foundation>=3.2; sys_platform == "win32"
+winrt-Windows.Security.Credentials.UI>=3.2; sys_platform == "win32"

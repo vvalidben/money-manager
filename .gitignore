@@ -11,6 +11,7 @@ dist/
 # Generated spec files; the maintained one is packaging/MoneyManager.spec.
 *.spec
 !packaging/MoneyManager.spec
+!packaging/installer/Setup.spec
 .coverage
 # A real configuration next to the program (the example is committed).
 MoneyManager.ini

@@ -26,6 +26,8 @@ from money_manager.services.dashboard_service import DashboardService
 from money_manager.services.goal_service import GoalService
 from money_manager.services.investment_service import InvestmentService
 from money_manager.services.net_worth_service import NetWorthService
+from money_manager.services.recurring_service import RecurringService
+from money_manager.services.report_service import ReportService
 from money_manager.services.settings_service import SettingsService
 from money_manager.services.statement_import_service import StatementImportService
 from money_manager.services.statistics_service import StatisticsService
@@ -51,6 +53,8 @@ class AppServices:
     subscriptions: SubscriptionService
     investments: InvestmentService
     net_worth: NetWorthService
+    reports: ReportService
+    recurring: RecurringService
     analysis: FinancialAnalysisService
     ai: AIService
     settings: SettingsService
@@ -85,11 +89,18 @@ class AppServices:
         rules = CategoryRuleService(database)
         investments = InvestmentService(database, transactions, today=today,
                                         base_currency=base_currency)
+        accounts = AccountService(database, today=today, default_currency=base_currency)
+        categories = CategoryService(database)
+        budgets = BudgetService(database, today=today, base_currency=base_currency)
+        statistics = StatisticsService(database, today=today, base_currency=base_currency)
+        goals = GoalService(database, today=today, base_currency=base_currency)
+        net_worth = NetWorthService(database, balances, investments, today=today,
+                                    base_currency=base_currency)
         allocations = AllocationService(database, balances, today=today,
                                         base_currency=base_currency)
         return cls(
-            accounts=AccountService(database, today=today, default_currency=base_currency),
-            categories=CategoryService(database),
+            accounts=accounts,
+            categories=categories,
             transactions=transactions,
             balances=balances,
             allocations=allocations,
@@ -97,18 +108,23 @@ class AppServices:
                 database, today=today, base_currency=base_currency
             ),
             account_transfers=AccountTransferService(database, transactions, today=today),
-            budgets=BudgetService(database, today=today, base_currency=base_currency),
+            budgets=budgets,
             statements=StatementImportService(database, transactions, rules, today=today),
             category_rules=rules,
             dashboard=DashboardService(database, today=today, base_currency=base_currency),
-            statistics=StatisticsService(database, today=today, base_currency=base_currency),
-            goals=GoalService(database, today=today, base_currency=base_currency),
+            statistics=statistics,
+            goals=goals,
             subscriptions=SubscriptionService(
                 database, transactions, today=today, base_currency=base_currency
             ),
             investments=investments,
-            net_worth=NetWorthService(database, balances, investments, today=today,
-                                      base_currency=base_currency),
+            net_worth=net_worth,
+            recurring=RecurringService(database, transactions, today=today,
+                                       base_currency=base_currency),
+            reports=ReportService(accounts=accounts, categories=categories,
+                                  transactions=transactions, statistics=statistics,
+                                  budgets=budgets, goals=goals, net_worth=net_worth,
+                                  today=today, base_currency=base_currency),
             analysis=analysis,
             ai=AIService(database, analysis, secret_store=secrets, environ=environ),
             settings=settings,

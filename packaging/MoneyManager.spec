@@ -54,6 +54,11 @@ a = Analysis(  # noqa: F821
         "sqlalchemy.dialects.sqlite.pysqlite",
         "logging.config",  # used by Alembic's env handling
         "anthropic",
+        # Windows Hello (imported lazily by ui.lock.hello)
+        "winrt.runtime",
+        "winrt.system",
+        "winrt.windows.foundation",
+        "winrt.windows.security.credentials.ui",
     ],
     excludes=excludes,
     noarchive=False,

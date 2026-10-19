@@ -1,10 +1,25 @@
-# Money Manager 1.3.0
+# Money Manager 1.4.0
 
 A local-first personal finance application for Windows. Your data stays in a
 database on your computer; nothing is sent anywhere unless you use online AI
 and confirm each request.
 
-## What's new in 1.3.0
+## What's new in 1.4.0
+
+- **Installer.** `MoneyManager-1.4.0-Setup.exe` installs Money Manager for you
+  (no administrator rights), adds it to the Start menu and Settings → Apps, and
+  updates it in place next time. Your data is never touched.
+- **Monthly report.** Statistics → *Monthly report…* saves a two-page PDF of a
+  month: totals compared with the month before, net worth, budgets, goals,
+  spending by category and the largest expenses.
+- **Recurring entries.** Transactions → *Recurring…*: your salary, rent or
+  savings are recorded automatically on each date.
+- **App lock.** Settings → App lock: ask for Windows Hello (PIN, fingerprint or
+  face) when Money Manager opens and after a while without use. Ctrl+L locks
+  at once.
+- **Light theme.** Settings → Appearance: dark, light, or the same as Windows.
+
+## New in 1.3.0
 
 - **Imports sort themselves.** When you change an imported entry's category,
   Money Manager remembers it (e.g. *marjane → Groceries*) and puts future lines

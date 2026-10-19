@@ -45,15 +45,15 @@ from money_manager.ui.theme import FONT_FAMILY, FONT_FILES, FONTS_DIR, Colors, S
 # then violet, orange, blue and yellow. Validated as a set on the dark ground
 # (#0c0d10): lightness band, chroma, adjacent CVD ΔE ≥ 8 and normal-vision
 # ΔE ≥ 15, contrast ≥ 3:1. (The design's pastels are too light for marks.)
-CATEGORICAL = ("#7ea23a", "#9085e9", "#d95926", "#3987e5", "#c98500")
+CATEGORICAL = (Colors.CHART_FIRST, "#9085e9", "#d95926", "#3987e5", "#c98500")
 # Income vs expenses: the blue/orange pair, separable with every colour vision.
 INCOME_COLOR = "#3987e5"
 EXPENSE_COLOR = "#d95926"
-BALANCE_COLOR = Colors.ACCENT  # the single balance line wears the accent, as in the design
+BALANCE_COLOR = Colors.CHART_LINE  # the single balance line wears the accent, as in the design
 PREVIOUS_COLOR = "#1c5cab"  # a darker step of the income blue ("before" next to "after")
 # Neutral chart ink comes from the theme so charts match the rest of the UI.
 OTHER_COLOR = Colors.TEXT_FAINT  # de-emphasis grey for folded "Other" slices
-GRID_COLOR = "#24272E"
+GRID_COLOR = Colors.CHART_GRID
 AXIS_COLOR = Colors.INPUT_HOVER_BORDER
 INK_MUTED = Colors.TEXT_MUTED
 INK_SECONDARY = Colors.TEXT_SECONDARY

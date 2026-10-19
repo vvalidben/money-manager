@@ -3,6 +3,7 @@
 import logging
 import sys
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QThreadPool
 from PySide6.QtGui import QIcon
@@ -14,15 +15,18 @@ from money_manager.core.errors import MoneyManagerError
 from money_manager.core.exception_hook import install_exception_hook
 from money_manager.core.logging_setup import configure_logging, shutdown_logging
 from money_manager.core.resources import resource_path
+from money_manager.core.cli import self_test_folder
 from money_manager.persistence.database import Database
-from money_manager.selftest import run_self_test, self_test_folder
 from money_manager.services import AppServices
 from money_manager.services.data_service import ensure_daily_copy
 from money_manager.services.settings_service import SettingsService
 from money_manager.ui import dialogs, motion
-from money_manager.ui.components.splash import LaunchScreen
-from money_manager.ui.main_window import MainWindow
-from money_manager.ui.theme import apply_theme
+from money_manager.ui.theme import apply_theme, resolve_palette, use_palette
+
+# The windows, pages and charts are imported only once the colour palette is
+# chosen (see ``run``): the charts copy colour tokens when they are imported.
+if TYPE_CHECKING:
+    from money_manager.ui.main_window import MainWindow
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +55,15 @@ class WindowManager:
     def __init__(self, config: AppConfig, database: Database) -> None:
         self._config = config
         self._database = database
-        self.window: MainWindow | None = None
+        self.window: "MainWindow | None" = None
 
-    def open(self, page_key: str | None = None) -> MainWindow:
+    def open(self, page_key: str | None = None) -> "MainWindow":
+        from money_manager.ui.main_window import MainWindow
+
         services = AppServices.create(self._database)
-        window = MainWindow(self._config, services)
+        # Locked on start; a rebuilt window (currency change, import …) is in use already.
+        start_locked = self.window is None and services.settings.app_lock_enabled()
+        window = MainWindow(self._config, services, start_locked=start_locked)
         window.reload_requested.connect(self.open)
         if page_key is not None:
             window.show_page(page_key)
@@ -97,6 +105,8 @@ def run(argv: Sequence[str] | None = None) -> int:
 
     folder = self_test_folder(sys.argv if argv is None else argv)
     if folder is not None:
+        from money_manager.selftest import run_self_test
+
         try:
             return run_self_test(folder, app)
         finally:
@@ -112,6 +122,10 @@ def run(argv: Sequence[str] | None = None) -> int:
         return 1
 
     settings = SettingsService(database)
+    palette = resolve_palette(settings.theme())
+    if palette != "dark":
+        use_palette(palette)
+        apply_theme(app)
     motion.set_user_enabled(settings.animations_enabled())
     if settings.daily_copies_enabled():
         try:
@@ -120,6 +134,8 @@ def run(argv: Sequence[str] | None = None) -> int:
             logger.warning("Could not write the daily copy: %s", exc)
     windows = WindowManager(config, database)
     if motion.enabled():
+        from money_manager.ui.components.splash import LaunchScreen
+
         # A short launch screen, then the window appears as the screen fades.
         splash = LaunchScreen()
         splash.intro_finished.connect(windows.open)

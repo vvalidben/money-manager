@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from money_manager import APP_NAME, __version__
-from money_manager.core.errors import ConflictError
+from money_manager.core.errors import ConflictError, ValidationError
 from money_manager.domain.currency import SUPPORTED_CURRENCIES, CurrencyInfo, validate_currency
 from money_manager.domain.money import DEFAULT_CURRENCY
 from money_manager.persistence.database import CREATED_AT_KEY, Database
@@ -27,6 +27,14 @@ logger = logging.getLogger(__name__)
 CURRENCY_KEY = "currency"
 ANIMATIONS_KEY = "animations"
 DAILY_COPIES_KEY = "daily_copies"
+APP_LOCK_KEY = "app_lock"
+LOCK_AFTER_KEY = "lock_after_minutes"
+THEME_KEY = "theme"
+
+LOCK_AFTER_CHOICES = (1, 5, 15, 30, 0)  # minutes without use; 0 = only when asked
+DEFAULT_LOCK_AFTER = 5
+THEMES = ("dark", "light", "system")  # "system" follows Windows' app mode
+DEFAULT_THEME = "dark"
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,18 +105,66 @@ class SettingsService:
     def set_daily_copies_enabled(self, enabled: bool) -> bool:
         return self._set_flag(DAILY_COPIES_KEY, "Daily copies", enabled)
 
-    def _flag(self, key: str, name: str) -> bool:
+    # ------------------------------------------------------------- app lock
+
+    def app_lock_enabled(self) -> bool:
+        """Whether Windows Hello is asked for on start and after idle time (off by default)."""
+        return self._flag(APP_LOCK_KEY, "app lock", default=False)
+
+    def set_app_lock_enabled(self, enabled: bool) -> bool:
+        return self._set_flag(APP_LOCK_KEY, "App lock", enabled)
+
+    def lock_after_minutes(self) -> int:
+        """Minutes without use before the app locks itself; 0 = only when asked."""
+        value = self._stored(LOCK_AFTER_KEY, "lock time")
+        if isinstance(value, bool) or value not in LOCK_AFTER_CHOICES:
+            return DEFAULT_LOCK_AFTER
+        return value  # type: ignore[return-value]
+
+    def set_lock_after_minutes(self, minutes: int) -> int:
+        if isinstance(minutes, bool) or minutes not in LOCK_AFTER_CHOICES:
+            raise ValidationError("Choose one of the offered lock times.", "lock_after")
+        with self._database.session() as session:
+            SettingRepository(session).set(LOCK_AFTER_KEY, json.dumps(minutes))
+        logger.info("Lock after %s minutes", minutes)
+        return minutes
+
+    # ---------------------------------------------------------------- theme
+
+    def theme(self) -> str:
+        """``dark``, ``light`` or ``system``."""
+        value = self._stored(THEME_KEY, "theme")
+        return value if value in THEMES else DEFAULT_THEME
+
+    def set_theme(self, theme: str) -> str:
+        if theme not in THEMES:
+            raise ValidationError("Choose dark, light or the Windows setting.", "theme")
+        with self._database.session() as session:
+            SettingRepository(session).set(THEME_KEY, json.dumps(theme))
+        logger.info("Theme set to %s", theme)
+        return theme
+
+    # -------------------------------------------------------------- helpers
+
+    def _stored(self, key: str, name: str) -> object:
+        """The stored JSON value, or None when absent or unreadable."""
         with self._database.session() as session:
             stored = SettingRepository(session).get(key)
         if stored is None:
-            return True
+            return None
         try:
-            value = json.loads(stored)
+            return json.loads(stored)
         except ValueError:
-            value = None
+            logger.warning("Ignoring an unreadable %s setting", name)
+            return None
+
+    def _flag(self, key: str, name: str, *, default: bool = True) -> bool:
+        value = self._stored(key, name)
+        if value is None:
+            return default
         if not isinstance(value, bool):
             logger.warning("Ignoring an unreadable %s setting", name)
-            return True
+            return default
         return value
 
     def _set_flag(self, key: str, name: str, enabled: bool) -> bool:

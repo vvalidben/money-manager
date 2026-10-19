@@ -64,3 +64,32 @@ def _release_log_files() -> Iterator[None]:
     """Close log handlers so Windows can delete temporary folders."""
     yield
     shutdown_logging()
+
+
+class FakeVerifier:
+    """Stands in for Windows Hello: tests set ``status_value`` and ``answers``."""
+
+    def __init__(self) -> None:
+        from money_manager.ui.lock.hello import HelloResult, HelloStatus
+
+        self.status_value = HelloStatus.AVAILABLE
+        self.answers: list[HelloResult] = []
+        self.default = HelloResult.VERIFIED
+        self.messages: list[str] = []
+
+    def status(self):  # noqa: ANN201
+        return self.status_value
+
+    def verify(self, message: str):  # noqa: ANN201
+        self.messages.append(message)
+        return self.answers.pop(0) if self.answers else self.default
+
+
+@pytest.fixture(autouse=True)
+def hello_verifier(monkeypatch: pytest.MonkeyPatch) -> FakeVerifier:
+    """Never ask the real Windows Hello in tests."""
+    from money_manager.ui.lock import hello
+
+    fake = FakeVerifier()
+    monkeypatch.setattr(hello, "default_verifier", lambda: fake)
+    return fake

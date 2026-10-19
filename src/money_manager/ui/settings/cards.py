@@ -1,13 +1,15 @@
 """Settings page cards. Every rule is enforced by the services; cards only ask and show."""
 
 import logging
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 import PySide6
-from PySide6.QtCore import QStandardPaths, Qt, QUrl, Signal, qVersion
+from PySide6.QtCore import QProcess, QStandardPaths, Qt, QUrl, Signal, qVersion
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QGridLayout,
@@ -22,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from money_manager.core.config import AppConfig
+from money_manager.core.resources import is_frozen
 from money_manager.core.errors import MoneyManagerError
 from money_manager.domain.enums import CategoryKind
 from money_manager.domain.money import DEFAULT_CURRENCY
@@ -32,7 +35,7 @@ from money_manager.ui import dialogs, motion
 from money_manager.ui.components import Card, FlowRow, compact_combo
 from money_manager.ui.formatting import format_date
 from money_manager.ui.settings.reset_dialog import ResetDialog
-from money_manager.ui.theme import Spacing
+from money_manager.ui.theme import Spacing, current_palette, resolve_palette
 
 logger = logging.getLogger(__name__)
 
@@ -116,12 +119,39 @@ class StorageCard(Card):
         self.body.addLayout(row)
 
 
+THEME_LABELS = (("dark", "Dark"), ("light", "Light"), ("system", "Same as Windows"))
+
+
+def restart_application() -> None:
+    """Start a new Money Manager and close this one (used to apply a new theme)."""
+    arguments = sys.argv[1:] if is_frozen() else ["-m", "money_manager", *sys.argv[1:]]
+    if QProcess.startDetached(sys.executable, arguments):
+        QApplication.quit()
+
+
 class AppearanceCard(Card):
-    """Animations on or off (page entrances, counting figures, filling bars, notices)."""
+    """Theme, and animations on or off (page entrances, counting figures, filling bars,
+    notices)."""
 
     def __init__(self, services: AppServices, parent: QWidget | None = None) -> None:
         super().__init__("Appearance", parent)
         self._settings = services.settings
+        self.theme_combo = QComboBox()
+        self.theme_combo.setAccessibleName("Theme")
+        for key, label in THEME_LABELS:
+            self.theme_combo.addItem(label, key)
+        self.theme_combo.setMaximumWidth(260)
+        self.theme_combo.currentIndexChanged.connect(self.save_theme)
+        self.restart_note = _text("The new theme is used after a restart.", "MutedLabel")
+        self.restart_note.setWordWrap(False)
+        self.restart_button = QPushButton("Restart now")
+        self.restart_button.clicked.connect(lambda: restart_application())
+        theme_row = QHBoxLayout()
+        theme_row.addWidget(self.theme_combo)
+        theme_row.addWidget(self.restart_note)
+        theme_row.addWidget(self.restart_button)
+        theme_row.addStretch(1)
+        self.body.addLayout(theme_row)
         self.animations_box = QCheckBox("Animations")
         self.animations_box.setAccessibleName("Animations")
         self.animations_box.toggled.connect(self.save)
@@ -141,6 +171,25 @@ class AppearanceCard(Card):
         self.animations_box.setChecked(self._settings.animations_enabled())
         self.animations_box.blockSignals(False)
         self.system_note.setVisible(not motion.system_allows())
+        self.theme_combo.blockSignals(True)
+        self.theme_combo.setCurrentIndex(max(self.theme_combo.findData(self._settings.theme()), 0))
+        self.theme_combo.blockSignals(False)
+        self._show_restart()
+
+    def _show_restart(self) -> None:
+        """Offer a restart when the chosen theme is not the one on screen."""
+        pending = resolve_palette(self.theme_combo.currentData()) != current_palette()
+        self.restart_note.setVisible(pending)
+        self.restart_button.setVisible(pending)
+
+    def save_theme(self, _index: int) -> None:
+        try:
+            self._settings.set_theme(self.theme_combo.currentData())
+        except MoneyManagerError as exc:
+            dialogs.show_warning(self, "Could not save the setting", str(exc))
+            self.load()
+            return
+        self._show_restart()
 
     def save(self, enabled: bool) -> None:
         try:

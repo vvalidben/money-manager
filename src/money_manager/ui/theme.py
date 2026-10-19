@@ -12,6 +12,7 @@ Interactive controls show a visible focus ring for keyboard users.
 """
 
 import logging
+import sys
 
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
 from PySide6.QtWidgets import QApplication, QWidget
@@ -110,6 +111,107 @@ class Colors:
     TILE_MUTED = "rgba(11, 11, 13, 0.7)"
     TILE_RULE = "rgba(11, 11, 13, 0.12)"
     TOOLTIP_TEXT = ON_ACCENT
+
+    # Charts: hairline grid, the single-series line and the first categorical slot.
+    CHART_GRID = "#24272E"
+    CHART_LINE = ACCENT
+    CHART_FIRST = "#7EA23A"
+
+
+# The light palette changes the ground, surfaces, ink and states; the accent and
+# the page pastels stay (they are fills with dark ink on top). Colours used as
+# text or thin marks get darker steps so they keep their contrast on white.
+_DARK = {name: value for name, value in vars(Colors).items() if name.isupper()}
+_LIGHT = {
+    "CONTENT_BG": "#F3F3EF",
+    "SURFACE": "#FFFFFF",
+    "CARD_BG": "#FFFFFF",
+    "RAISED": "#ECECE7",
+    "PRESSED": "#E2E2DC",
+    "BORDER": "#E2E2DC",
+    "INPUT_BORDER": "#D3D3CC",
+    "INPUT_HOVER_BORDER": "#B4B5AE",
+    "TEXT": "#16181D",
+    "TEXT_SECONDARY": "#3A3D45",
+    "TEXT_MUTED": "#5E616A",
+    "TEXT_FAINT": "#858891",
+    "TEXT_DISABLED": "#A6A8AE",
+    "ACCENT_HOVER": "#B6E24F",
+    "SIDEBAR_BG": "#F3F3EF",
+    "SIDEBAR_TEXT": "#3A3D45",
+    "SIDEBAR_HOVER_BG": "rgba(0, 0, 0, 0.05)",
+    "FOCUS": "#5F7D1C",
+    "SELECTION_BG": "#E4F0C4",
+    "HOVER_BG": "#F0F0EB",
+    "ALTERNATE_ROW_BG": "#F9F9F6",
+    "INFLOW": "#1D7F53",
+    "OUTFLOW": "#16181D",
+    "ERROR_TEXT": "#C0362C",
+    "ERROR_BG": "rgba(192, 54, 44, 0.07)",
+    "ERROR_BORDER": "rgba(192, 54, 44, 0.35)",
+    "WARNING_TEXT": "#8A5A00",
+    "WARNING_BG": "rgba(255, 212, 92, 0.22)",
+    "WARNING_BORDER": "rgba(201, 133, 0, 0.45)",
+    "PRIVACY_TEXT": "#0B6680",
+    "PRIVACY_BG": "rgba(159, 231, 255, 0.28)",
+    "PRIVACY_BORDER": "rgba(11, 102, 128, 0.35)",
+    "PROGRESS_TRACK": "#E4E4DE",
+    "PROGRESS_FILL": "#7EA23A",
+    "TOOLTIP_BG": "#16181D",
+    "TOOLTIP_TEXT": "#F2F2EF",
+    "CHART_GRID": "#E9E9E4",
+    "CHART_LINE": "#5F7D1C",
+    "CHART_FIRST": "#5F7D1C",
+}
+PALETTES = ("dark", "light")
+_current_palette = "dark"
+
+
+def use_palette(name: str) -> None:
+    """Switch every colour token to the ``dark`` or ``light`` palette.
+
+    Call it before the UI modules are imported: some (the charts) copy tokens
+    into module constants. The application does so at start-up; changing the
+    theme in Settings therefore asks for a restart.
+    """
+    global _current_palette
+    if name not in PALETTES:
+        raise ValueError(f"Unknown palette {name!r}")
+    for token, value in _DARK.items():
+        setattr(Colors, token, value)
+    if name == "light":
+        for token, value in _LIGHT.items():
+            setattr(Colors, token, value)
+    _current_palette = name
+    logger.info("Using the %s palette", name)
+
+
+def current_palette() -> str:
+    return _current_palette
+
+
+PERSONALIZE_KEY = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+
+
+def windows_prefers_light() -> bool:
+    """Windows' "Choose your app mode" setting (dark when it cannot be read)."""
+    if sys.platform != "win32":
+        return False
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, PERSONALIZE_KEY) as key:
+            value, _kind = winreg.QueryValueEx(key, "AppsUseLightTheme")
+    except OSError:
+        return False
+    return bool(value)
+
+
+def resolve_palette(theme: str) -> str:
+    """The palette for a theme setting: ``dark``, ``light`` or ``system``."""
+    if theme == "system":
+        return "light" if windows_prefers_light() else "dark"
+    return theme if theme in PALETTES else "dark"
 
 
 # Each page's colour: its navigation pill, header mark and headline tile.
