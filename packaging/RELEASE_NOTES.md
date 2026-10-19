@@ -1,27 +1,56 @@
-# Money Manager 1.0.0
+# Money Manager 1.1.0
 
 A local-first personal finance application for Windows. Your data stays in a
 database on your computer; nothing is sent anywhere unless you use online AI
 and confirm each request.
 
+## What's new in 1.1.0
+
+- **New look.** Rounded tiles on a dark background, a colour for each page, an
+  icon rail that opens when you point at it, and search, *Ask AI* and
+  *New entry* on every page.
+- **Animations.** A short launch screen; pages that rise into place; figures
+  that count up; bars and goal rings that fill; and a notice confirming each
+  change. Switch them off in Settings → Appearance. They also stay off when
+  Windows' "Show animations" setting is off.
+- **Accounts page.** All your accounts with their balances. Add, rename or
+  delete accounts, and *Correct balance* to match what your bank shows.
+- **Transfers between accounts**, e.g. bank → cash wallet. Your total stays the
+  same, and a transfer never counts as income or spending.
+- **Budgets.** A monthly limit per spending category, with what is left, a
+  status (on track, near limit, over) and where you will end the month at your
+  current pace.
+- **Safety copies you can restore** from Settings → Safety copies. Money
+  Manager now also saves a copy automatically once a day and keeps the last 30.
+- **Details.** Goal progress rings, a colour badge for each category, and a
+  "Renewing soon" tile on the dashboard. Large figures now shrink to fit
+  instead of being cut off.
+
+Your data is upgraded automatically the first time you start 1.1.0 (a safety
+copy is saved first).
+
 ## What's included
 
-- **Accounts and transactions** — income, expenses and balance corrections,
-  with search, filters and CSV export. Amounts are exact to the centime.
-- **Allocations** — set money aside (e.g. Holiday, Emergency fund) without
+- **Accounts and transactions:** income, expenses, balance corrections and
+  transfers, with search, filters and CSV export. Amounts are exact to the
+  centime.
+- **Budgets:** monthly limits per spending category.
+- **Allocations:** set money aside (e.g. Holiday, Emergency fund) without
   counting it twice; spending tagged to an allocation comes out of it.
-- **Dashboard and statistics** — balance, income vs expenses, spending by
+- **Dashboard and statistics:** balance, income vs expenses, spending by
   category, trends, monthly comparisons and key facts for any date range.
-- **Goals** — savings targets with deadlines, kept in allocations or tracked
+- **Goals:** savings targets with deadlines, kept in allocations or tracked
   manually.
-- **Subscriptions & bills** — recurring payments you confirm when they happen.
-- **Investments** — contributions, withdrawals and the values you enter
-  (no market data, no advice).
-- **AI Advisor (optional)** — explanations of your own figures by a local model
-  (Ollama) or Anthropic's Claude, with the exact text shown before anything is
+- **Subscriptions & bills:** recurring payments you confirm when they happen.
+- **Investments:** contributions, withdrawals and the values you enter. There
+  is no market data and no advice.
+- **AI Advisor (optional):** explanations of your own figures by a local model
+  (Ollama) or Anthropic's Claude. The exact text is shown before anything is
   sent online. AI is off unless you turn it on.
-- **Backups** — export/import of everything as one verified file; reset with a
-  safety copy.
+- **Backups:**
+  - export and import of everything as one verified file;
+  - safety copies before risky changes and once a day;
+  - a reset protected by a typed confirmation.
 
 ## System requirements
 
@@ -32,16 +61,17 @@ and confirm each request.
 
 ## Installing
 
-1. Extract `MoneyManager-1.0.0-windows-x64.zip` to a folder of your choice,
-   e.g. `C:\Program Files\MoneyManager` or `%LOCALAPPDATA%\Programs\MoneyManager`.
-2. Start `MoneyManager.exe`. Pin it to Start or the taskbar if you like.
+1. Extract `MoneyManager-1.1.0-windows-x64.zip` to a folder of your choice,
+   e.g. `%LOCALAPPDATA%\Programs\MoneyManager`.
+2. Start `MoneyManager.exe`. You can pin it to Start or the taskbar.
 3. Windows SmartScreen may warn about an unrecognised app because the
-   executable is not code-signed: choose **More info → Run anyway**.
+   executable is not code-signed. If so, choose **More info → Run anyway**.
 
-To update, replace the program folder with the new version; your data is kept
-separately and is upgraded automatically (a backup of the database is made
-first). To uninstall, delete the program folder, and delete
-`%LOCALAPPDATA%\MoneyManager` if you also want to remove your data.
+**Updating:** replace the program folder with the new version. Your data is kept
+separately and is upgraded automatically (a copy is saved first).
+
+**Uninstalling:** delete the program folder. Also delete
+`%LOCALAPPDATA%\MoneyManager` if you want to remove your data.
 
 ## First start
 
@@ -51,17 +81,20 @@ elsewhere (e.g. portable use), see `MoneyManager.example.ini`.
 
 ## Privacy
 
-- Data is stored only on this computer. No account, cloud sync or telemetry.
+- Data is stored only on this computer. There is no account, cloud sync or
+  telemetry.
 - Local AI processes data on this computer. Online AI sends a summary of your
-  figures (never transaction descriptions or account names) only after you
+  figures (never transaction descriptions or account names), and only after you
   review and confirm it.
 - API keys are kept in the Windows Credential Manager, never in the database,
   backups or logs.
 
 ## Known limitations
 
-- The **Money / Allocations** page is a placeholder in this version:
-  allocations are created and funded through goals, and transactions can be
-  tagged to them.
-- The executable is not code-signed (SmartScreen warning on first start).
-- One currency for all amounts (MAD by default); no currency conversion.
+- The **Money / Allocations** page is still a placeholder. Allocations are
+  created and funded through goals, and transactions can be tagged to them.
+- The executable is not code-signed, so SmartScreen may warn the first time.
+- One currency for all amounts (MAD by default); there is no currency
+  conversion.
+- The first nine pages have Ctrl+1…Ctrl+9 shortcuts; AI Advisor and Settings
+  have none.

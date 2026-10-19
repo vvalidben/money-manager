@@ -119,7 +119,8 @@ FILL_COLORS = {
     "orange": Colors.ORANGE, "cyan": Colors.CYAN, "stone": Colors.STONE,
 }
 PAGE_FILLS = {
-    "dashboard": "lime", "transactions": "sun", "budgets": "coral", "allocations": "sky", "goals": "mint",
+    "dashboard": "lime", "accounts": "sky", "transactions": "sun", "budgets": "coral",
+    "allocations": "mint", "goals": "mint",
     "subscriptions": "pink", "investments": "violet", "statistics": "orange",
     "ai_advisor": "cyan", "settings": "stone",
 }

@@ -14,6 +14,7 @@ class PageSpec:
 
 
 DASHBOARD_PAGE_KEY = "dashboard"
+ACCOUNTS_PAGE_KEY = "accounts"
 DEFAULT_PAGE_KEY = DASHBOARD_PAGE_KEY
 SETTINGS_PAGE_KEY = "settings"
 TRANSACTIONS_PAGE_KEY = "transactions"
@@ -36,6 +37,14 @@ PAGES: tuple[PageSpec, ...] = (
             "Once you start recording transactions, this page will summarise your balance, "
             "how your money is allocated and how this month compares to the last."
         ),
+    ),
+    PageSpec(
+        key=ACCOUNTS_PAGE_KEY,
+        nav_label="Accounts",
+        title="Accounts",
+        subtitle="Where your money is kept, and how much is in each account.",
+        placeholder_heading="No accounts yet",
+        placeholder_message="Add the account you want to track first.",
     ),
     PageSpec(
         key=TRANSACTIONS_PAGE_KEY,

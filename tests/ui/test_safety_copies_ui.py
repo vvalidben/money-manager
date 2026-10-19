@@ -70,3 +70,12 @@ def test_no_copies_yet(qapp: QApplication, app_config: AppConfig,
     assert card.list.isHidden() and not card.empty_label.isHidden()
     assert not card.restore_button.isEnabled()
     card.deleteLater()
+
+
+def test_daily_copies_switch(qapp: QApplication, app_config: AppConfig,
+                             app_services: AppServices) -> None:
+    card = SafetyCopiesCard(app_services, app_config)
+    assert card.daily_box.isChecked()
+    card.daily_box.setChecked(False)
+    assert app_services.settings.daily_copies_enabled() is False
+    card.deleteLater()

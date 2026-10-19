@@ -18,7 +18,8 @@ committing; any failure rolls everything back, so data is never half-imported.
 confirmation word, after writing a safety backup.
 
 **Safety copies** are the database copies written next to the database before
-a reset, an import, a restore or a schema upgrade. Restoring one replaces all
+a reset, an import, a restore or a schema upgrade, plus one automatic copy a
+day (the newest ``DAILY_COPIES_KEPT`` are kept). Restoring one replaces all
 current data the same way as an import (after a safety copy of the current
 data, in one transaction); a copy from an older version is upgraded first, in
 a temporary folder, so the copy itself is never changed.
@@ -71,7 +72,10 @@ SAFETY_REASONS = {
     "before-reset": "Before a reset",
     "before-import": "Before importing a backup",
     "before-restore": "Before restoring a safety copy",
+    "daily": "Daily automatic copy",
 }
+DAILY_REASON = "daily"
+DAILY_COPIES_KEPT = 30
 _SAFETY_NAME = re.compile(r"^(?P<stem>.+)\.backup-(?P<reason>.+)-(?P<stamp>\d{8}T\d{6}Z)\.db$")
 # Leading characters that make spreadsheet programs evaluate a cell as a formula.
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
@@ -314,6 +318,48 @@ class DataService:
                 logger.warning("Data was reset but the API key could not be removed: %s", exc)
         logger.info("All application data was reset")
         return ResetResult(safety, removed)
+
+
+# ---------------------------------------------------------- daily copies
+
+
+def ensure_daily_copy(database: Database, keep: int = DAILY_COPIES_KEPT,
+                      now: datetime | None = None) -> Path | None:
+    """Write today's automatic copy unless there is one (or no data yet), then keep
+    only the newest ``keep`` daily copies. Returns the new copy, if one was written."""
+    database_path = database.path
+    if database_path is None or not database_path.exists():
+        return None
+    moment = (now or datetime.now(UTC)).astimezone()
+    dailies = _daily_copies(database_path)
+    if any(created.astimezone().date() == moment.date() for created, _ in dailies):
+        return None
+    with database.session() as session:
+        has_data = session.execute(select(AccountModel.id).limit(1)).first() is not None
+    if not has_data:
+        return None
+    copy = database.backup(DAILY_REASON)
+    for _created, old in _daily_copies(database_path)[keep:]:
+        try:
+            old.unlink()
+        except OSError:
+            logger.warning("Could not remove the old daily copy %s", old.name)
+    if copy is not None:
+        logger.info("Wrote the daily copy %s", copy.name)
+    return copy
+
+
+def _daily_copies(database_path: Path) -> list[tuple[datetime, Path]]:
+    """Daily copies next to the database, newest first."""
+    found = []
+    for path in database_path.parent.glob(f"{database_path.stem}.backup-{DAILY_REASON}-*.db"):
+        match = _SAFETY_NAME.match(path.name)
+        if match is None or match.group("reason") != DAILY_REASON:
+            continue
+        created = datetime.strptime(match.group("stamp"), "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+        found.append((created, path))
+    found.sort(reverse=True)
+    return found
 
 
 # ---------------------------------------------------------------- helpers

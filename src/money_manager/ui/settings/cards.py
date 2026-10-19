@@ -381,9 +381,9 @@ class SafetyCopiesCard(Card):
         self._config = config
         self.body.addWidget(_text(
             "Money Manager saves a copy of all your data before every reset, import or "
-            "restore, and before an update changes how data is stored. Restoring a copy "
-            "replaces your current data, which is itself saved first, so a restore can be "
-            "undone the same way."))
+            "restore, before an update changes how data is stored, and once a day. "
+            "Restoring a copy replaces your current data, which is itself saved first, so "
+            "a restore can be undone the same way."))
         self.list = QListWidget()
         self.list.setAccessibleName("Safety copies")
         self.list.setMinimumHeight(132)
@@ -393,6 +393,10 @@ class SafetyCopiesCard(Card):
         self.body.addWidget(self.list)
         self.empty_label = _text("No safety copies yet.", "MutedLabel")
         self.body.addWidget(self.empty_label)
+        self.daily_box = QCheckBox("Save a copy automatically each day (the last 30 are kept)")
+        self.daily_box.setAccessibleName("Daily copies")
+        self.daily_box.toggled.connect(self._save_daily)
+        self.body.addWidget(self.daily_box)
         self.restore_button = QPushButton("Restore\u2026")
         self.restore_button.clicked.connect(self.restore)
         self.folder_button = QPushButton("Open data folder")
@@ -407,7 +411,16 @@ class SafetyCopiesCard(Card):
         self.copies: list[SafetyCopy] = []
         self.load()
 
+    def _save_daily(self, enabled: bool) -> None:
+        try:
+            self._services.settings.set_daily_copies_enabled(enabled)
+        except MoneyManagerError as exc:
+            _set_status(self.status_label, str(exc), error=True)
+
     def load(self) -> None:
+        self.daily_box.blockSignals(True)
+        self.daily_box.setChecked(self._services.settings.daily_copies_enabled())
+        self.daily_box.blockSignals(False)
         try:
             self.copies = self._services.data.safety_copies()
         except (MoneyManagerError, OSError) as exc:

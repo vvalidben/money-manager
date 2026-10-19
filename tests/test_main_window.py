@@ -14,6 +14,7 @@ from money_manager.ui.theme import PAGE_FILLS, page_fill
 
 EXPECTED_SECTIONS = [
     "dashboard",
+    "accounts",
     "transactions",
     "budgets",
     "allocations",

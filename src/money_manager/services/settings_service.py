@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 CURRENCY_KEY = "currency"
 ANIMATIONS_KEY = "animations"
+DAILY_COPIES_KEY = "daily_copies"
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,8 +83,23 @@ class SettingsService:
 
     def animations_enabled(self) -> bool:
         """The user's choice; on unless switched off in Settings."""
+        return self._flag(ANIMATIONS_KEY, "animations")
+
+    def set_animations_enabled(self, enabled: bool) -> bool:
+        return self._set_flag(ANIMATIONS_KEY, "Animations", enabled)
+
+    # --------------------------------------------------------- daily copies
+
+    def daily_copies_enabled(self) -> bool:
+        """Whether a copy of the data is saved automatically each day (on by default)."""
+        return self._flag(DAILY_COPIES_KEY, "daily copies")
+
+    def set_daily_copies_enabled(self, enabled: bool) -> bool:
+        return self._set_flag(DAILY_COPIES_KEY, "Daily copies", enabled)
+
+    def _flag(self, key: str, name: str) -> bool:
         with self._database.session() as session:
-            stored = SettingRepository(session).get(ANIMATIONS_KEY)
+            stored = SettingRepository(session).get(key)
         if stored is None:
             return True
         try:
@@ -91,14 +107,14 @@ class SettingsService:
         except ValueError:
             value = None
         if not isinstance(value, bool):
-            logger.warning("Ignoring an unreadable animations setting")
+            logger.warning("Ignoring an unreadable %s setting", name)
             return True
         return value
 
-    def set_animations_enabled(self, enabled: bool) -> bool:
+    def _set_flag(self, key: str, name: str, enabled: bool) -> bool:
         with self._database.session() as session:
-            SettingRepository(session).set(ANIMATIONS_KEY, json.dumps(bool(enabled)))
-        logger.info("Animations %s", "on" if enabled else "off")
+            SettingRepository(session).set(key, json.dumps(bool(enabled)))
+        logger.info("%s %s", name, "on" if enabled else "off")
         return bool(enabled)
 
     # ---------------------------------------------------------- information

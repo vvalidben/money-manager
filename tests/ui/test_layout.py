@@ -63,3 +63,11 @@ def test_page_fits_the_minimum_window(window: MainWindow, key: str) -> None:
             assert area.widget().width() <= area.viewport().width() + 1, (
                 f"{key}: content {area.widget().width()} px wider than "
                 f"{area.viewport().width()} px")
+
+
+def test_every_rail_button_fits_the_smallest_window(window: MainWindow) -> None:
+    rail = window.sidebar
+    QApplication.processEvents()
+    bottoms = [rail.button(spec.key).geometry().bottom() for spec in PAGES]
+    status_top = rail._status_label.parentWidget().height()  # the rail itself
+    assert max(bottoms) < status_top - 24, "the last page button would overlap the footer"

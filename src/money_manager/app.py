@@ -17,6 +17,7 @@ from money_manager.core.resources import resource_path
 from money_manager.persistence.database import Database
 from money_manager.selftest import run_self_test, self_test_folder
 from money_manager.services import AppServices
+from money_manager.services.data_service import ensure_daily_copy
 from money_manager.services.settings_service import SettingsService
 from money_manager.ui import dialogs, motion
 from money_manager.ui.components.splash import LaunchScreen
@@ -110,7 +111,13 @@ def run(argv: Sequence[str] | None = None) -> int:
         shutdown_logging()
         return 1
 
-    motion.set_user_enabled(SettingsService(database).animations_enabled())
+    settings = SettingsService(database)
+    motion.set_user_enabled(settings.animations_enabled())
+    if settings.daily_copies_enabled():
+        try:
+            ensure_daily_copy(database)
+        except MoneyManagerError as exc:  # a missed copy must never stop the app
+            logger.warning("Could not write the daily copy: %s", exc)
     windows = WindowManager(config, database)
     if motion.enabled():
         # A short launch screen, then the window appears as the screen fades.

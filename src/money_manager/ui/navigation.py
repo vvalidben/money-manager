@@ -39,7 +39,7 @@ from money_manager.ui.theme import Colors, Spacing, page_fill, set_style_propert
 RAIL_WIDTH = 84
 EXPANDED_WIDTH = 268
 SIDEBAR_WIDTH = RAIL_WIDTH  # the space the rail takes in the window layout
-BUTTON_HEIGHT = 42  # ten pages must fit the smallest window
+BUTTON_HEIGHT = 38  # eleven pages must fit the smallest window
 BRAND_SIZE = 44
 ICON_SIZE = 20
 ANIMATION_MS = 220
@@ -52,7 +52,8 @@ ICON_PATHS = {
     "dashboard": "M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z",
     "transactions": "M8 3 4 7l4 4 M4 7h16 M16 21l4-4-4-4 M20 17H4",
     "budgets": "M21 12A9 9 0 1 1 12 3v9z M15 3.5A9 9 0 0 1 20.5 9H15z",
-    "allocations": "M3 21h18 M5 21V10 M9.5 21V10 M14.5 21V10 M19 21V10 M2 10l10-7 10 7z",
+    "accounts": "M3 21h18 M5 21V10 M9.5 21V10 M14.5 21V10 M19 21V10 M2 10l10-7 10 7z",
+    "allocations": "M12 3 2 8l10 5 10-5z M2 13l10 5 10-5 M2 17.5l10 5 10-5",
     "goals": ("M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18 M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10 "
               "M12 11a1 1 0 1 0 0 2a1 1 0 1 0 0-2"),
     "subscriptions": ("M17 2l4 4-4 4 M3 11v-1a4 4 0 0 1 4-4h14 M7 22l-4-4 4-4 "

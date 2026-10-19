@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from money_manager import APP_NAME
 from money_manager.core.config import AppConfig
 from money_manager.services import AppServices
+from money_manager.ui.accounts.accounts_page import AccountsPage
 from money_manager.ui.advisor.advisor_page import AdvisorPage
 from money_manager.ui.budgets.budgets_page import BudgetsPage
 from money_manager.ui.components import StatCard
@@ -35,6 +36,7 @@ from money_manager.ui.navigation import (
     line_icon,
 )
 from money_manager.ui.pages import (
+    ACCOUNTS_PAGE_KEY,
     AI_ADVISOR_PAGE_KEY,
     BUDGETS_PAGE_KEY,
     DASHBOARD_PAGE_KEY,
@@ -274,6 +276,8 @@ class MainWindow(QMainWindow):
             return SubscriptionsPage(spec, services)
         if spec.key == INVESTMENTS_PAGE_KEY:
             return InvestmentsPage(spec, services)
+        if spec.key == ACCOUNTS_PAGE_KEY:
+            return AccountsPage(spec, services)
         if spec.key == BUDGETS_PAGE_KEY:
             return BudgetsPage(spec, services)
         if spec.key == AI_ADVISOR_PAGE_KEY:

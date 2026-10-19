@@ -1,4 +1,4 @@
-"""Create-account dialog (needed before the first transaction can be recorded)."""
+"""Create or edit an account (one is needed before the first transaction can be recorded)."""
 
 from PySide6.QtCore import QRegularExpression
 from PySide6.QtGui import QRegularExpressionValidator
@@ -26,12 +26,14 @@ OPENING_BALANCE_PATTERN = r"-?[0-9   ]*([.,][0-9]{0,2})?"
 
 
 class AccountDialog(QDialog):
-    def __init__(self, services: AppServices, parent: QWidget | None = None) -> None:
+    def __init__(self, services: AppServices, parent: QWidget | None = None, *,
+                 account: Account | None = None) -> None:
         super().__init__(parent)
         self._services = services
+        self._original = account
         self.saved: Account | None = None
 
-        self.setWindowTitle("Create account")
+        self.setWindowTitle("Edit account" if account else "Create account")
         self.setModal(True)
         self.setMinimumWidth(420)
 
@@ -73,7 +75,7 @@ class AccountDialog(QDialog):
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
         save = buttons.button(QDialogButtonBox.StandardButton.Save)
-        save.setText("Create account")
+        save.setText("Save changes" if account else "Create account")
         save.setObjectName("PrimaryButton")
         buttons.accepted.connect(self.submit)
         buttons.rejected.connect(self.reject)
@@ -87,16 +89,26 @@ class AccountDialog(QDialog):
             layout.addWidget(field)
         layout.addWidget(buttons)
 
+        if account is not None:
+            self.name_edit.setText(account.name)
+            self.balance_edit.setText(str(account.opening_balance.amount))
+            self.date_edit.setDate(to_qdate(account.opening_date))
+
     def submit(self) -> bool:
         for field in self.fields.values():
             field.set_error(None)
         self.form_error.hide()
         try:
-            self.saved = self._services.accounts.create(
-                self.name_edit.text(),
-                opening_balance=parse_amount_text(self.balance_edit.text(), "opening_balance"),
-                opening_date=self.date_edit.date().toPython(),
-            )
+            opening_balance = parse_amount_text(self.balance_edit.text(), "opening_balance")
+            opening_date = self.date_edit.date().toPython()
+            if self._original is None:
+                self.saved = self._services.accounts.create(
+                    self.name_edit.text(), opening_balance=opening_balance,
+                    opening_date=opening_date)
+            else:
+                self.saved = self._services.accounts.update(
+                    self._original.id, name=self.name_edit.text(),
+                    opening_balance=opening_balance, opening_date=opening_date)
         except ValidationError as exc:
             field = self.fields.get(exc.field or "")
             if field is not None:
