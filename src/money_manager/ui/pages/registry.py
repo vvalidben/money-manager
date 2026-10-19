@@ -17,6 +17,7 @@ DASHBOARD_PAGE_KEY = "dashboard"
 DEFAULT_PAGE_KEY = DASHBOARD_PAGE_KEY
 SETTINGS_PAGE_KEY = "settings"
 TRANSACTIONS_PAGE_KEY = "transactions"
+BUDGETS_PAGE_KEY = "budgets"
 STATISTICS_PAGE_KEY = "statistics"
 GOALS_PAGE_KEY = "goals"
 SUBSCRIPTIONS_PAGE_KEY = "subscriptions"
@@ -45,6 +46,14 @@ PAGES: tuple[PageSpec, ...] = (
         placeholder_message=(
             "Recording income and expenses with your own categories is coming in the next sprint."
         ),
+    ),
+    PageSpec(
+        key=BUDGETS_PAGE_KEY,
+        nav_label="Budgets",
+        title="Budgets",
+        subtitle="Monthly limits per spending category, compared with this month so far.",
+        placeholder_heading="No budgets yet",
+        placeholder_message="Set a monthly limit for a spending category.",
     ),
     PageSpec(
         key="allocations",

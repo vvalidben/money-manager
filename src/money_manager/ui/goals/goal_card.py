@@ -1,15 +1,15 @@
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from money_manager.ui.components.card import Card
+from money_manager.ui.components.progress_ring import ProgressRing
 from money_manager.ui.goals.view_model import GoalCardView
-from money_manager.ui.theme import Spacing, set_style_property
-
-BAR_STEPS = 1000
+from money_manager.ui.theme import Spacing, identity_color, set_style_property
 
 
 class GoalCard(Card):
-    """One goal: status, progress bar, amounts, deadline, pace and actions."""
+    """One goal: a progress ring in the goal's colour, status, amounts, deadline,
+    pace and actions."""
 
     add_requested = Signal(int)
     withdraw_requested = Signal(int)
@@ -20,7 +20,11 @@ class GoalCard(Card):
     def __init__(self, view: GoalCardView, parent: QWidget | None = None) -> None:
         super().__init__(parent=parent)
         self.view = view
-        self.body.setSpacing(Spacing.SM)
+        self.body.setSpacing(Spacing.MD)
+
+        self.ring = ProgressRing(112, 9)
+        self.ring.set_progress(float(view.bar_fraction), view.percent,
+                               identity_color(view.goal_id))  # drawing only
 
         title = QLabel(view.name)
         title.setObjectName("CardHeading")
@@ -29,41 +33,34 @@ class GoalCard(Card):
         self.badge.setObjectName("LevelBadge")
         set_style_property(self.badge, "level", view.status_level)
         header = QHBoxLayout()
-        header.addWidget(title)
-        header.addStretch(1)
-        header.addWidget(self.badge)
-        self.body.addLayout(header)
+        header.setSpacing(Spacing.SM)
+        header.addWidget(title, 1)
+        header.addWidget(self.badge, 0, Qt.AlignmentFlag.AlignTop)
 
+        details = QVBoxLayout()
+        details.setSpacing(6)
+        details.addLayout(header)
         if view.description:
             description = QLabel(view.description)
             description.setObjectName("CardBody")
             description.setWordWrap(True)
-            self.body.addWidget(description)
-
-        self.bar = QProgressBar()
-        self.bar.setObjectName("GoalBar")
-        self.bar.setTextVisible(False)
-        self.bar.setFixedHeight(8)
-        self.bar.setRange(0, BAR_STEPS)
-        self.bar.setValue(int(view.bar_fraction * BAR_STEPS))  # drawing only
-        self.body.addWidget(self.bar)
-
-        amounts = QHBoxLayout()
+            details.addWidget(description)
         self.amounts_label = QLabel(view.amounts)
         self.amounts_label.setObjectName("AllocationAmount")
         self.amounts_label.setWordWrap(True)
-        self.percent_label = QLabel(view.percent)
-        self.percent_label.setObjectName("AllocationAmount")
-        # The label takes the free width, so it wraps only when it really runs out of room.
-        amounts.addWidget(self.amounts_label, 1)
-        amounts.addWidget(self.percent_label, 0, Qt.AlignmentFlag.AlignTop)
-        self.body.addLayout(amounts)
-
+        details.addWidget(self.amounts_label)
         for text in (view.remaining, view.deadline, view.pace, view.tracking):
             label = QLabel(text)
             label.setObjectName("MutedLabel")
             label.setWordWrap(True)
-            self.body.addWidget(label)
+            details.addWidget(label)
+        details.addStretch(1)
+
+        top = QHBoxLayout()
+        top.setSpacing(Spacing.LG)
+        top.addWidget(self.ring, 0, Qt.AlignmentFlag.AlignTop)
+        top.addLayout(details, 1)
+        self.body.addLayout(top)
 
         actions = QHBoxLayout()
         actions.setSpacing(Spacing.SM)

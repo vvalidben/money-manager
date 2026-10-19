@@ -20,7 +20,7 @@ from PySide6.QtCore import (
     QTimer,
     Signal,
 )
-from PySide6.QtGui import QEnterEvent, QFocusEvent, QIcon, QPixmap
+from PySide6.QtGui import QEnterEvent, QFocusEvent, QIcon, QPixmap, QResizeEvent, QShowEvent
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -33,14 +33,17 @@ from PySide6.QtWidgets import (
 )
 
 from money_manager import APP_NAME, __version__
-from money_manager.ui.theme import Colors, Spacing
+from money_manager.ui import motion
+from money_manager.ui.theme import Colors, Spacing, page_fill, set_style_property
 
 RAIL_WIDTH = 84
 EXPANDED_WIDTH = 268
 SIDEBAR_WIDTH = RAIL_WIDTH  # the space the rail takes in the window layout
-BUTTON_HEIGHT = 48
+BUTTON_HEIGHT = 42  # ten pages must fit the smallest window
+BRAND_SIZE = 44
 ICON_SIZE = 20
 ANIMATION_MS = 220
+INDICATOR_MS = 420
 KEYBOARD_FOCUS = (Qt.FocusReason.TabFocusReason, Qt.FocusReason.BacktabFocusReason,
                   Qt.FocusReason.ShortcutFocusReason)
 
@@ -48,6 +51,7 @@ KEYBOARD_FOCUS = (Qt.FocusReason.TabFocusReason, Qt.FocusReason.BacktabFocusReas
 ICON_PATHS = {
     "dashboard": "M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z",
     "transactions": "M8 3 4 7l4 4 M4 7h16 M16 21l4-4-4-4 M20 17H4",
+    "budgets": "M21 12A9 9 0 1 1 12 3v9z M15 3.5A9 9 0 0 1 20.5 9H15z",
     "allocations": "M3 21h18 M5 21V10 M9.5 21V10 M14.5 21V10 M19 21V10 M2 10l10-7 10 7z",
     "goals": ("M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18 M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10 "
               "M12 11a1 1 0 1 0 0 2a1 1 0 1 0 0-2"),
@@ -132,16 +136,25 @@ class Sidebar(QFrame):
         self._animation.setDuration(ANIMATION_MS)
         self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
+        # The current page's pill: one coloured shape that glides between buttons.
+        self._indicator = QFrame(self)
+        self._indicator.setObjectName("NavIndicator")
+        self._indicator.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self._indicator.hide()
+        self._indicator_animation = QPropertyAnimation(self._indicator, b"geometry", self)
+        self._indicator_animation.setDuration(INDICATOR_MS)
+        self._indicator_animation.setEasingCurve(QEasingCurve.Type.OutBack)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, Spacing.MD, 18, Spacing.MD)
-        layout.setSpacing(6)
+        layout.setSpacing(4)
 
         brand_row = QHBoxLayout()
         brand_row.setContentsMargins(0, 0, 0, 0)
         brand_row.setSpacing(14)
         mark = QLabel("M")
         mark.setObjectName("BrandMark")
-        mark.setFixedSize(BUTTON_HEIGHT, BUTTON_HEIGHT)
+        mark.setFixedSize(BRAND_SIZE, BRAND_SIZE)
         mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
         mark.setAccessibleName(APP_NAME)
         brand_row.addWidget(mark)
@@ -153,7 +166,7 @@ class Sidebar(QFrame):
         brand_text.addWidget(self._label("Personal finance, kept local", "SidebarTagline"))
         brand_row.addWidget(self._brand_text, 1)
         layout.addLayout(brand_row)
-        layout.addSpacing(18)
+        layout.addSpacing(14)
 
         for item in items:
             layout.addWidget(self._create_button(item))
@@ -178,6 +191,31 @@ class Sidebar(QFrame):
 
     def set_current(self, key: str) -> None:
         self._buttons[key].setChecked(True)
+        set_style_property(self._indicator, "fill", page_fill(key))
+        self._place_indicator(animated=self._indicator.isVisible())
+
+    def _place_indicator(self, *, animated: bool) -> None:
+        key = self.current_key()
+        if key is None or not self.isVisible():
+            return
+        target = self._buttons[key].geometry()
+        self._indicator_animation.stop()
+        if animated and motion.enabled():
+            self._indicator_animation.setStartValue(self._indicator.geometry())
+            self._indicator_animation.setEndValue(target)
+            self._indicator_animation.start()
+        else:
+            self._indicator.setGeometry(target)
+        self._indicator.show()
+        self._indicator.lower()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._place_indicator(animated=False)  # buttons widen and narrow with the rail
+
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802
+        super().showEvent(event)
+        QTimer.singleShot(0, self, lambda: self._place_indicator(animated=False))
 
     # ------------------------------------------------------------ expansion
 
@@ -221,7 +259,7 @@ class Sidebar(QFrame):
                 self.set_expanded(True)
             elif event.type() == QEvent.Type.FocusOut:
                 QTimer.singleShot(0, self, self._collapse_unless_used)
-        return super().eventFilter(watched, event)
+        return False  # observe only; the button handles the event as usual
 
     def _collapse_unless_used(self) -> None:
         if not self.underMouse() and not self._has_focus_inside():

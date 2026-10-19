@@ -75,13 +75,14 @@ class TransactionDialog(QDialog):
         )
         self.currency_label = QLabel(services.base_currency)
         self.currency_label.setObjectName("MutedLabel")
-        amount_row = _row(self.amount_edit, self.currency_label)
+        amount_row = side_by_side(self.amount_edit, self.currency_label)
 
         self.category_combo = QComboBox()
         self.new_category_button = QToolButton()
         self.new_category_button.setText("New…")
         self.new_category_button.clicked.connect(self._prompt_new_category)
-        category_row = _row(self.category_combo, self.new_category_button, stretch_first=True)
+        category_row = side_by_side(self.category_combo, self.new_category_button,
+                                    stretch_first=True)
 
         self.date_edit = QDateEdit()
         self.date_edit.setCalendarPopup(True)
@@ -325,7 +326,7 @@ class TransactionDialog(QDialog):
         self.form_error.show()
 
 
-def _row(first: QWidget, second: QWidget, *, stretch_first: bool = True) -> QWidget:
+def side_by_side(first: QWidget, second: QWidget, *, stretch_first: bool = True) -> QWidget:
     container = QWidget()
     layout = QHBoxLayout(container)
     layout.setContentsMargins(0, 0, 0, 0)

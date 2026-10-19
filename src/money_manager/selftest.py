@@ -34,6 +34,7 @@ from money_manager.domain.periods import StatsRange
 from money_manager.persistence.database import Database
 from money_manager.persistence.migrator import current_revision, head_revision
 from money_manager.services import AppServices
+from money_manager.ui import motion
 from money_manager.ui.main_window import MainWindow
 from money_manager.ui.pages import PAGES
 
@@ -154,9 +155,21 @@ class SelfTest:
         self.check("record transactions", transactions)
         self.check("allocations and transfers", allocations)
         self.check("balance", lambda: s.balances.total_balance() == EXPECTED_BALANCE)
+        self.check("transfers and budgets", lambda: self.transfers_and_budgets(s, state))
         self.check("goals, subscriptions, investments", lambda: self.other_features(s, state))
         self.check("AI configuration", lambda: self.configure_ai(s))
         self.check("settings and backup", lambda: self.settings(s))
+
+    @staticmethod
+    def transfers_and_budgets(s: AppServices, state: dict[str, Any]) -> bool:
+        cash = s.accounts.create("Self-test cash", opening_balance="0",
+                                 opening_date=s.today() - timedelta(days=40))
+        s.account_transfers.create(state["bank"].id, cash.id, "150", s.today())
+        s.budgets.set(state["food"].id, "2000")
+        [food] = s.budgets.overview().statuses
+        return (s.balances.total_balance() == EXPECTED_BALANCE  # moving money adds nothing
+                and s.balances.balance(cash.id) == Money.of("150")
+                and food.spent == Money.of("1300"))
 
     @staticmethod
     def other_features(s: AppServices, state: dict[str, Any]) -> bool:
@@ -186,7 +199,10 @@ class SelfTest:
 
     def second_run(self, s: AppServices) -> None:
         self.check("data persisted", lambda: [a.name for a in s.accounts.list()]
-                   == ["Self-test bank"] and len(s.transactions.list()) == 3)
+                   == ["Self-test bank", "Self-test cash"] and len(s.transactions.list()) == 5)
+        self.check("transfers and budgets persisted",
+                   lambda: (len(s.account_transfers.list()),
+                            len(s.budgets.overview().statuses)) == (1, 1))
         self.check("balance persisted", lambda: s.balances.total_balance() == EXPECTED_BALANCE)
         self.check("allocation persisted", lambda: [(a.name, s.allocations.balance(a.id))
                    for a in s.allocations.list()] == [("Holiday", Money.of("400"))])
@@ -222,4 +238,6 @@ class SelfTest:
 
 
 def run_self_test(folder: Path, app: QApplication) -> int:
+    # Still pages, so the screenshots show each page in its final state.
+    motion.set_user_enabled(False)
     return SelfTest(folder, app).run()

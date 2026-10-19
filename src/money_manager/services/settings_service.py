@@ -1,4 +1,4 @@
-"""Application settings: the base currency and application information.
+"""Application settings: the base currency, animations and application information.
 
 The currency can only change while no account exists: amounts are never
 converted (there are no exchange rates), so switching the currency of
@@ -25,6 +25,7 @@ from money_manager.persistence.repositories import AccountRepository, SettingRep
 logger = logging.getLogger(__name__)
 
 CURRENCY_KEY = "currency"
+ANIMATIONS_KEY = "animations"
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +77,29 @@ class SettingsService:
             SettingRepository(session).set(CURRENCY_KEY, json.dumps(currency))
         logger.info("Base currency set to %s", currency)
         return currency
+
+    # ----------------------------------------------------------- animations
+
+    def animations_enabled(self) -> bool:
+        """The user's choice; on unless switched off in Settings."""
+        with self._database.session() as session:
+            stored = SettingRepository(session).get(ANIMATIONS_KEY)
+        if stored is None:
+            return True
+        try:
+            value = json.loads(stored)
+        except ValueError:
+            value = None
+        if not isinstance(value, bool):
+            logger.warning("Ignoring an unreadable animations setting")
+            return True
+        return value
+
+    def set_animations_enabled(self, enabled: bool) -> bool:
+        with self._database.session() as session:
+            SettingRepository(session).set(ANIMATIONS_KEY, json.dumps(bool(enabled)))
+        logger.info("Animations %s", "on" if enabled else "off")
+        return bool(enabled)
 
     # ---------------------------------------------------------- information
 

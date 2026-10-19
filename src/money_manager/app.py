@@ -17,7 +17,9 @@ from money_manager.core.resources import resource_path
 from money_manager.persistence.database import Database
 from money_manager.selftest import run_self_test, self_test_folder
 from money_manager.services import AppServices
-from money_manager.ui import dialogs
+from money_manager.services.settings_service import SettingsService
+from money_manager.ui import dialogs, motion
+from money_manager.ui.components.splash import LaunchScreen
 from money_manager.ui.main_window import MainWindow
 from money_manager.ui.theme import apply_theme
 
@@ -108,8 +110,16 @@ def run(argv: Sequence[str] | None = None) -> int:
         shutdown_logging()
         return 1
 
+    motion.set_user_enabled(SettingsService(database).animations_enabled())
     windows = WindowManager(config, database)
-    windows.open()
+    if motion.enabled():
+        # A short launch screen, then the window appears as the screen fades.
+        splash = LaunchScreen()
+        splash.intro_finished.connect(windows.open)
+        splash.intro_finished.connect(splash.fade_out)
+        splash.start()
+    else:
+        windows.open()
     try:
         return app.exec()
     finally:

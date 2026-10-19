@@ -4,12 +4,14 @@ No figures are computed here: every amount, ratio and health judgement comes
 from the service/domain; this module only chooses words and formats.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal
 
 from money_manager.domain.dashboard import DashboardOverview
 from money_manager.domain.health import HealthLevel
+from money_manager.domain.subscriptions import UpcomingPayment
 from money_manager.ui.formatting import (
     format_date,
     format_day_range,
@@ -190,3 +192,36 @@ def _health_rows(overview: DashboardOverview) -> tuple[HealthRowView, ...]:
             "",
         ),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class RenewalView:
+    day: str  # day of the month, for the date badge
+    name: str
+    when: str
+    amount: str
+    overdue: bool
+
+
+def renewal_views(payments: Sequence[UpcomingPayment], limit: int = 4) -> tuple[RenewalView, ...]:
+    """The next few subscription payments, soonest first (overdue ones first of all)."""
+    return tuple(
+        RenewalView(
+            day=str(payment.due_date.day),
+            name=payment.subscription.name,
+            when=_when(payment.days_until),
+            amount=format_money(payment.amount),
+            overdue=payment.is_overdue,
+        )
+        for payment in payments[:limit]
+    )
+
+
+def _when(days: int) -> str:
+    if days < 0:
+        return f"Overdue by {-days} day{'' if days == -1 else 's'}"
+    if days == 0:
+        return "Today"
+    if days == 1:
+        return "Tomorrow"
+    return f"In {days} days"

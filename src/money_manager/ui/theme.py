@@ -106,6 +106,9 @@ class Colors:
     PROGRESS_FILL = ACCENT
 
     TOOLTIP_BG = TEXT
+    # Text and rules on a filled pastel tile (dark ink at 70 % / 12 %).
+    TILE_MUTED = "rgba(11, 11, 13, 0.7)"
+    TILE_RULE = "rgba(11, 11, 13, 0.12)"
     TOOLTIP_TEXT = ON_ACCENT
 
 
@@ -116,10 +119,23 @@ FILL_COLORS = {
     "orange": Colors.ORANGE, "cyan": Colors.CYAN, "stone": Colors.STONE,
 }
 PAGE_FILLS = {
-    "dashboard": "lime", "transactions": "sun", "allocations": "sky", "goals": "mint",
+    "dashboard": "lime", "transactions": "sun", "budgets": "coral", "allocations": "sky", "goals": "mint",
     "subscriptions": "pink", "investments": "violet", "statistics": "orange",
     "ai_advisor": "cyan", "settings": "stone",
 }
+
+
+# Identity colours for goals and categories (always shown next to their name).
+# The order is fixed and an item keeps its colour by id, so colours never shuffle.
+IDENTITY_COLORS = (Colors.MINT, Colors.ACCENT, Colors.SKY, Colors.PINK, Colors.VIOLET,
+                   Colors.SUN, Colors.CORAL, Colors.ORANGE, Colors.CYAN)
+
+
+def identity_color(item_id: int | None) -> str:
+    """A stable pastel for a goal or category id; stone for none (e.g. adjustments)."""
+    if item_id is None:
+        return Colors.STONE
+    return IDENTITY_COLORS[(item_id - 1) % len(IDENTITY_COLORS)]
 
 
 def page_fill(key: str) -> str:
@@ -135,7 +151,10 @@ class FontSize:
 
     PAGE_TITLE = 36
     STAT = 28
+    STAT_M = 24  # figures step down until they fit their tile
     STAT_COMPACT = 22
+    STAT_S = 20
+    STAT_XS = 17
     BRAND = 18
     SECTION = 16
     BUTTON = 14
@@ -155,7 +174,6 @@ class Spacing:
 
 
 def _fill_rules() -> str:
-    c = Colors
     rules = []
     for name, colour in FILL_COLORS.items():
         rules.append(f"""
@@ -163,11 +181,9 @@ def _fill_rules() -> str:
         background-color: {colour};
         border: 1px solid {colour};
     }}""")
-    for key, name in PAGE_FILLS.items():
         rules.append(f"""
-    #NavButton[page="{key}"]:checked {{
-        background-color: {FILL_COLORS[name]};
-        color: {c.NAV_ACTIVE_TEXT};
+    #NavIndicator[fill="{name}"] {{
+        background-color: {colour};
     }}""")
     return "".join(rules)
 
@@ -222,7 +238,16 @@ def build_stylesheet() -> str:
         color: {c.TEXT};
     }}
     #NavButton:checked {{
+        background-color: transparent;
+        color: {c.NAV_ACTIVE_TEXT};
         font-weight: 600;
+    }}
+    #NavButton:checked:hover {{
+        background-color: transparent;
+    }}
+    #NavIndicator {{
+        border-radius: 14px;
+        background-color: {c.ACCENT};
     }}
     #NavButton:focus:!checked {{
         border: 1px solid {c.ACCENT};
@@ -273,6 +298,88 @@ def build_stylesheet() -> str:
         padding: 3px 10px;
         font-size: {f.CAPTION}px;
         font-weight: 600;
+    }}
+
+    #Card:hover, #StatColumn:hover {{
+        border-color: {c.INPUT_HOVER_BORDER};
+    }}
+
+    /* Confirmation toast */
+    #Toast {{
+        background-color: {c.RAISED};
+        border: 1px solid {c.INPUT_BORDER};
+        border-radius: 18px;
+    }}
+    #ToastCheck {{
+        background-color: {c.ACCENT};
+        border-radius: 16px;
+    }}
+    #ToastTitle {{
+        font-size: {f.BODY}px;
+        font-weight: 600;
+    }}
+    #ToastDetail {{
+        font-family: {mono};
+        font-size: {f.SMALL}px;
+        color: {c.TEXT_MUTED};
+    }}
+
+    /* Renewing soon: a filled pink tile with dark text */
+    #RenewingTile {{
+        background-color: {c.PINK};
+        border: 1px solid {c.PINK};
+        border-radius: 24px;
+    }}
+    #TileHeading {{
+        color: {c.ON_ACCENT};
+        font-size: {f.SECTION}px;
+        font-weight: 600;
+    }}
+    #TileText {{
+        color: {c.ON_ACCENT};
+        font-size: {f.BODY}px;
+        font-weight: 500;
+    }}
+    #TileMuted {{
+        color: {c.TILE_MUTED};
+        font-size: {f.SMALL}px;
+    }}
+    #TileMuted[overdue="true"] {{
+        color: {c.ON_ACCENT};
+        font-weight: 700;
+    }}
+    #TileFigure {{
+        color: {c.ON_ACCENT};
+        font-family: {mono};
+        font-size: {f.BODY}px;
+        font-weight: 600;
+    }}
+    #TileRow {{
+        background-color: transparent;
+        border: none;
+        border-top: 1px solid {c.TILE_RULE};
+    }}
+    #DayBadge {{
+        background-color: {c.ON_ACCENT};
+        color: {c.PINK};
+        border-radius: 12px;
+        font-family: {mono};
+        font-size: {f.BODY}px;
+        font-weight: 600;
+    }}
+    #TilePill {{
+        background-color: {c.ON_ACCENT};
+        color: {c.PINK};
+        border: 1px solid {c.ON_ACCENT};
+        border-radius: 13px;
+        padding: 5px 12px;
+        font-size: {f.SMALL}px;
+    }}
+    #TilePill:hover {{
+        background-color: {c.RAISED};
+    }}
+    #TilePill:focus {{
+        border: 1px solid {c.TEXT};
     }}
 
     /* Inputs */
@@ -517,6 +624,15 @@ def build_stylesheet() -> str:
         font-size: {f.STAT_COMPACT}px;
         font-weight: 600;
     }}
+    #StatValue[fit="m"], #StatValueCompact[fit="m"] {{
+        font-size: {f.STAT_M}px;
+    }}
+    #StatValue[fit="s"], #StatValueCompact[fit="s"] {{
+        font-size: {f.STAT_S}px;
+    }}
+    #StatValue[fit="xs"], #StatValueCompact[fit="xs"] {{
+        font-size: {f.STAT_XS}px;
+    }}
     #StatValue[tone="inflow"], #StatValueCompact[tone="inflow"] {{
         color: {c.INFLOW};
     }}
@@ -550,6 +666,21 @@ def build_stylesheet() -> str:
         border: none;
         border-radius: 4px;
         background-color: {c.PROGRESS_TRACK};
+    }}
+    #BudgetBar {{
+        border: none;
+        border-radius: 4px;
+        background-color: {c.PROGRESS_TRACK};
+    }}
+    #BudgetBar::chunk {{
+        border-radius: 4px;
+        background-color: {c.MINT};
+    }}
+    #BudgetBar[level="near_limit"]::chunk {{
+        background-color: {c.SUN};
+    }}
+    #BudgetBar[level="over"]::chunk {{
+        background-color: {c.ERROR_TEXT};
     }}
     #GoalBar::chunk, #ShareBar::chunk {{
         border-radius: 4px;

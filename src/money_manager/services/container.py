@@ -12,11 +12,13 @@ from typing import Self
 from money_manager.ai.secrets import SecretStore, default_secret_store
 from money_manager.persistence.database import Database
 from money_manager.services.account_service import AccountService
+from money_manager.services.account_transfer_service import AccountTransferService
 from money_manager.services.ai_service import AIService
 from money_manager.services.allocation_service import AllocationService
 from money_manager.services.analysis_service import FinancialAnalysisService
 from money_manager.services.allocation_transfer_service import AllocationTransferService
 from money_manager.services.balance_service import BalanceService
+from money_manager.services.budget_service import BudgetService
 from money_manager.services.category_service import CategoryService
 from money_manager.services.data_service import DataService
 from money_manager.services.dashboard_service import DashboardService
@@ -36,6 +38,8 @@ class AppServices:
     balances: BalanceService
     allocations: AllocationService
     transfers: AllocationTransferService
+    account_transfers: AccountTransferService
+    budgets: BudgetService
     dashboard: DashboardService
     statistics: StatisticsService
     goals: GoalService
@@ -83,6 +87,8 @@ class AppServices:
             transfers=AllocationTransferService(
                 database, today=today, base_currency=base_currency
             ),
+            account_transfers=AccountTransferService(database, transactions, today=today),
+            budgets=BudgetService(database, today=today, base_currency=base_currency),
             dashboard=DashboardService(database, today=today, base_currency=base_currency),
             statistics=StatisticsService(database, today=today, base_currency=base_currency),
             goals=GoalService(database, today=today, base_currency=base_currency),

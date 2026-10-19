@@ -76,6 +76,10 @@ def everything(services: AppServices, monkeypatch: pytest.MonkeyPatch) -> AppSer
                                            date(2026, 6, 4), None, description="Rounding"))
     s.transfers.transfer(from_allocation_id=None, to_allocation_id=holiday.id, amount="100",
                          on=date(2026, 6, 5), note="top up")
+    cash = s.accounts.create("Cash", opening_balance="0", opening_date=date(2026, 1, 1))
+    s.account_transfers.create(bank.id, cash.id, "200", date(2026, 6, 5),
+                               description="Cash for the market")
+    s.budgets.set(food.id, "1800")
     s.goals.create_with_new_allocation("Car", target="50000", deadline=date(2027, 6, 1),
                                        initial_amount="500")
     s.goals.create_manual("Gift", target="800", current="200")
@@ -197,7 +201,7 @@ def test_backup_file_format(everything: AppServices, tmp_path: Path) -> None:
     row = dict(zip(accounts["columns"], accounts["rows"][0], strict=True))
     assert row["opening_balance_minor"] == 1000055  # exact integer minor units
     assert row["opening_date"] == "2026-01-01"
-    assert summary.count("transactions") == 5  # incl. subscription + contribution expenses
+    assert summary.count("transactions") == 7  # incl. subscription, contribution, transfer
     assert not list(tmp_path.glob("*.tmp"))
 
 
@@ -216,7 +220,7 @@ def test_transactions_csv(everything: AppServices, tmp_path: Path) -> None:
     raw = path.read_bytes()
     assert raw.startswith(b"\xef\xbb\xbf")  # BOM so spreadsheet programs read UTF-8
     rows = list(csv.reader(path.read_text(encoding="utf-8-sig").splitlines()))
-    assert count == 5 and len(rows) == 6
+    assert count == 7 and len(rows) == 8
     assert rows[0] == ["Date", "Type", "Account", "Category", "Allocation", "Amount",
                        "Currency", "Description", "Notes"]
     salary = next(r for r in rows if r[7] == "Salary")
@@ -225,6 +229,8 @@ def test_transactions_csv(everything: AppServices, tmp_path: Path) -> None:
     assert food[5] == "-250.75" and food[8] == "café, «notes»"
     assert food[7] == "'=HYPERLINK(\"http://x\")"  # not run as a formula
     assert next(r for r in rows if r[7] == "Rounding")[5] == "-0.01"
+    transfer = sorted((r[1], r[2], r[5]) for r in rows if r[7] == "Cash for the market")
+    assert transfer == [("Transfer in", "Cash", "200.00"), ("Transfer out", "Bank", "-200.00")]
 
 
 # ------------------------------------------------------------------ import
@@ -299,7 +305,7 @@ def test_import_writes_a_safety_backup_first(everything: AppServices, database: 
     assert result.safety_backup is not None and result.safety_backup.is_file()
     assert "before-import" in result.safety_backup.name
     with sqlite3.connect(result.safety_backup) as copy:
-        assert copy.execute("SELECT count(*) FROM transactions").fetchone()[0] == 5
+        assert copy.execute("SELECT count(*) FROM transactions").fetchone()[0] == 7
 
 
 # ------------------------------------------------------------------- reset
@@ -321,7 +327,7 @@ def test_reset(everything: AppServices, database: Database, store: MemorySecretS
     assert all(not rows for rows in snapshot(database).values())
     assert result.safety_backup is not None and "before-reset" in result.safety_backup.name
     with sqlite3.connect(result.safety_backup) as copy:
-        assert copy.execute("SELECT count(*) FROM accounts").fetchone()[0] == 1
+        assert copy.execute("SELECT count(*) FROM accounts").fetchone()[0] == 2
     assert store.get(ANTHROPIC_KEY_NAME) == TEST_KEY and not result.api_key_removed
     rebuilt = build(database, store)
     assert rebuilt.base_currency == "MAD" and rebuilt.ai.settings() == AISettings()

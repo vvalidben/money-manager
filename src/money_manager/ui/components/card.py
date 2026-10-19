@@ -1,3 +1,4 @@
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
 from money_manager.ui.theme import Spacing
@@ -9,6 +10,7 @@ class Card(QFrame):
     def __init__(self, heading: str | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("Card")
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)  # border lights up on hover
 
         self._body = QVBoxLayout(self)
         self._body.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)

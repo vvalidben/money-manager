@@ -8,10 +8,13 @@ import PySide6
 from PySide6.QtCore import QStandardPaths, Qt, QUrl, Signal, qVersion
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
     QSizePolicy,
     QWidget,
@@ -21,8 +24,10 @@ from money_manager.core.config import AppConfig
 from money_manager.core.errors import MoneyManagerError
 from money_manager.domain.money import DEFAULT_CURRENCY
 from money_manager.services import AppServices
-from money_manager.ui import dialogs
+from money_manager.services.data_service import SafetyCopy
+from money_manager.ui import dialogs, motion
 from money_manager.ui.components import Card, FlowRow, compact_combo
+from money_manager.ui.formatting import format_date
 from money_manager.ui.settings.reset_dialog import ResetDialog
 from money_manager.ui.theme import Spacing
 
@@ -106,6 +111,42 @@ class StorageCard(Card):
         row.addWidget(self.open_button)
         row.addStretch(1)
         self.body.addLayout(row)
+
+
+class AppearanceCard(Card):
+    """Animations on or off (page entrances, counting figures, filling bars, notices)."""
+
+    def __init__(self, services: AppServices, parent: QWidget | None = None) -> None:
+        super().__init__("Appearance", parent)
+        self._settings = services.settings
+        self.animations_box = QCheckBox("Animations")
+        self.animations_box.setAccessibleName("Animations")
+        self.animations_box.toggled.connect(self.save)
+        self.note = _text(
+            "Tiles rise into place, figures count up, bars and rings fill, and a short "
+            "notice confirms each change. Switch off for a still interface.", "MutedLabel")
+        self.system_note = _text(
+            "Windows' \"Show animations in Windows\" setting is off, so Money Manager "
+            "stays still as well.", "MutedLabel")
+        self.body.addWidget(self.animations_box)
+        self.body.addWidget(self.note)
+        self.body.addWidget(self.system_note)
+        self.load()
+
+    def load(self) -> None:
+        self.animations_box.blockSignals(True)
+        self.animations_box.setChecked(self._settings.animations_enabled())
+        self.animations_box.blockSignals(False)
+        self.system_note.setVisible(not motion.system_allows())
+
+    def save(self, enabled: bool) -> None:
+        try:
+            self._settings.set_animations_enabled(enabled)
+        except MoneyManagerError as exc:
+            dialogs.show_warning(self, "Could not save the setting", str(exc))
+            self.load()
+            return
+        motion.set_user_enabled(enabled)
 
 
 class CurrencyCard(Card):
@@ -326,3 +367,109 @@ class AboutCard(Card):
             "Money Manager works fully offline. The only network connections it can make are "
             "to a local Ollama server and, when you confirm a request, to Anthropic's API.",
             "MutedLabel"))
+
+
+class SafetyCopiesCard(Card):
+    """The automatic safety copies, with a way to restore one."""
+
+    changed = Signal()  # the data was replaced by a restore
+
+    def __init__(self, services: AppServices, config: AppConfig,
+                 parent: QWidget | None = None) -> None:
+        super().__init__("Safety copies", parent)
+        self._services = services
+        self._config = config
+        self.body.addWidget(_text(
+            "Money Manager saves a copy of all your data before every reset, import or "
+            "restore, and before an update changes how data is stored. Restoring a copy "
+            "replaces your current data, which is itself saved first, so a restore can be "
+            "undone the same way."))
+        self.list = QListWidget()
+        self.list.setAccessibleName("Safety copies")
+        self.list.setMinimumHeight(132)
+        self.list.setMaximumHeight(220)
+        self.list.currentRowChanged.connect(self._update_buttons)
+        self.list.itemDoubleClicked.connect(lambda _item: self.restore())
+        self.body.addWidget(self.list)
+        self.empty_label = _text("No safety copies yet.", "MutedLabel")
+        self.body.addWidget(self.empty_label)
+        self.restore_button = QPushButton("Restore\u2026")
+        self.restore_button.clicked.connect(self.restore)
+        self.folder_button = QPushButton("Open data folder")
+        self.folder_button.clicked.connect(lambda: open_folder(self._config.data_dir))
+        row = QHBoxLayout()
+        row.addWidget(self.restore_button)
+        row.addWidget(self.folder_button)
+        row.addStretch(1)
+        self.body.addLayout(row)
+        self.status_label = _status_label()
+        self.body.addWidget(self.status_label)
+        self.copies: list[SafetyCopy] = []
+        self.load()
+
+    def load(self) -> None:
+        try:
+            self.copies = self._services.data.safety_copies()
+        except (MoneyManagerError, OSError) as exc:
+            self.copies = []
+            _set_status(self.status_label, f"Could not list the safety copies: {exc}", error=True)
+        self.list.clear()
+        for copy in self.copies:
+            item = QListWidgetItem(safety_copy_text(copy))
+            item.setToolTip(str(copy.path))
+            self.list.addItem(item)
+        self.list.setVisible(bool(self.copies))
+        self.empty_label.setVisible(not self.copies)
+        if self.copies:
+            self.list.setCurrentRow(0)
+        self._update_buttons()
+
+    def selected(self) -> SafetyCopy | None:
+        row = self.list.currentRow()
+        return self.copies[row] if 0 <= row < len(self.copies) else None
+
+    def _update_buttons(self) -> None:
+        copy = self.selected()
+        self.restore_button.setEnabled(copy is not None and copy.readable)
+
+    def restore(self) -> None:
+        copy = self.selected()
+        if copy is None or not copy.readable:
+            return
+        message = (
+            f"Replace ALL current data with this safety copy?\n\n{safety_copy_text(copy)}"
+            "\n\nYour current data is first saved as a new safety copy, so you can come "
+            "back to it.")
+        if not dialogs.confirm_destructive(self, "Restore safety copy", message,
+                                           "Replace my data"):
+            return
+        try:
+            result = self._services.data.restore_safety_copy(copy.path)
+        except MoneyManagerError as exc:
+            _set_status(self.status_label, str(exc), error=True)
+            return
+        details = [f"Your data from {_when(copy)} was restored."]
+        if result.safety_backup is not None:
+            details.append(f"The data you had before was saved to:\n{result.safety_backup}")
+        if result.consistency is not None and not result.consistency.is_consistent:
+            details.append("Warning: some allocation balances in the restored data do not add "
+                           "up. Check the Money / Allocations page.")
+        dialogs.show_info(self, "Restore complete", "\n\n".join(details))
+        self.changed.emit()
+
+
+def _when(copy: SafetyCopy) -> str:
+    local = copy.created_at.astimezone()
+    return f"{format_date(local.date())}, {local:%H:%M}"
+
+
+def safety_copy_text(copy: SafetyCopy) -> str:
+    """"Before a reset · 16 Oct 2026, 12:35 · 1 account, 42 transactions"."""
+    if not copy.readable:
+        contents = "cannot be read"
+    else:
+        accounts = f"{copy.accounts} account{'' if copy.accounts == 1 else 's'}"
+        transactions = (f"{copy.transactions} transaction"
+                        f"{'' if copy.transactions == 1 else 's'}")
+        contents = f"{accounts}, {transactions}"
+    return f"{copy.reason_text} \u00b7 {_when(copy)} \u00b7 {contents}"

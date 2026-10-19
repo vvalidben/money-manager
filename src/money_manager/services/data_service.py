@@ -16,6 +16,12 @@ committing; any failure rolls everything back, so data is never half-imported.
 
 **Reset** deletes all data only when the caller passes the exact
 confirmation word, after writing a safety backup.
+
+**Safety copies** are the database copies written next to the database before
+a reset, an import, a restore or a schema upgrade. Restoring one replaces all
+current data the same way as an import (after a safety copy of the current
+data, in one transaction); a copy from an older version is upgraded first, in
+a temporary folder, so the copy itself is never changed.
 """
 
 import csv
@@ -23,6 +29,10 @@ import hashlib
 import json
 import logging
 import os
+import re
+import shutil
+import sqlite3
+import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -42,6 +52,7 @@ from money_manager.persistence.database import Database
 from money_manager.persistence.migrator import current_revision, known_revisions
 from money_manager.persistence.models import (
     AccountModel,
+    AccountTransferModel,
     AllocationModel,
     CategoryModel,
     TransactionModel,
@@ -56,6 +67,12 @@ MAX_BACKUP_BYTES = 200 * 1024 * 1024
 RESET_CONFIRMATION = "RESET"
 # Internal bookkeeping about the database file itself (creation date, etc.).
 EXCLUDED_TABLES = frozenset({"app_metadata"})
+SAFETY_REASONS = {
+    "before-reset": "Before a reset",
+    "before-import": "Before importing a backup",
+    "before-restore": "Before restoring a safety copy",
+}
+_SAFETY_NAME = re.compile(r"^(?P<stem>.+)\.backup-(?P<reason>.+)-(?P<stamp>\d{8}T\d{6}Z)\.db$")
 # Leading characters that make spreadsheet programs evaluate a cell as a formula.
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
@@ -87,6 +104,24 @@ class ImportResult:
     summary: BackupSummary
     safety_backup: Path | None
     consistency: ConsistencyReport | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SafetyCopy:
+    path: Path
+    reason: str  # "before-reset", "before-import", "before-restore", or a schema revision
+    created_at: datetime  # UTC, from the file name
+    size_bytes: int
+    accounts: int | None  # None when the copy cannot be read
+    transactions: int | None
+
+    @property
+    def readable(self) -> bool:
+        return self.accounts is not None
+
+    @property
+    def reason_text(self) -> str:
+        return SAFETY_REASONS.get(self.reason, "Before an update of Money Manager")
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,12 +181,17 @@ class DataService:
                 .order_by(TransactionModel.occurred_on, TransactionModel.id))
         with self._database.session() as session:
             rows = session.execute(stmt).all()
+            transfer_sides = {}
+            for model in session.scalars(select(AccountTransferModel)):
+                transfer_sides[model.out_transaction_id] = "Transfer out"
+                transfer_sides[model.in_transaction_id] = "Transfer in"
         lines: list[list[str]] = [["Date", "Type", "Account", "Category", "Allocation",
                                    "Amount", "Currency", "Description", "Notes"]]
         for model, account, category, allocation_name in rows:
             kind = TransactionType(model.type)
             amount = Money.from_minor_units(model.amount_minor * kind.sign, model.currency)
-            lines.append([model.occurred_on.isoformat(), kind.label, _cell(account),
+            label = transfer_sides.get(model.id, kind.label)
+            lines.append([model.occurred_on.isoformat(), label, _cell(account),
                           _cell(category or ""), _cell(allocation_name or ""),
                           str(amount.amount), model.currency, _cell(model.description),
                           _cell(model.notes)])
@@ -192,7 +232,15 @@ class DataService:
         summary = self.read_backup(path)
         converted = {table.name: _rows_for(table, document["tables"][table.name])
                      for table in data_tables()}
-        safety = self._database.backup("before-import")
+        safety = self._replace_all(converted, "before-import", "backup", "imported")
+        logger.info("Imported a backup with %d rows", summary.total_rows)
+        report = self._check_consistency() if self._check_consistency is not None else None
+        return ImportResult(summary, safety, report)
+
+    def _replace_all(self, converted: Mapping[str, list[dict[str, Any]]], label: str,
+                     source: str, verb: str) -> Path | None:
+        """Safety copy, then every row replaced in one transaction (all or nothing)."""
+        safety = self._database.backup(label)
         try:
             with self._database.session() as session:
                 for table in reversed(data_tables()):
@@ -203,12 +251,47 @@ class DataService:
                         session.execute(insert(table), rows)
                 violations = session.execute(text("PRAGMA foreign_key_check")).fetchall()
                 if violations:
-                    raise ValidationError("The backup's records do not fit together (broken "
-                                          "references). Nothing was imported.")
+                    raise ValidationError(f"The {source}'s records do not fit together (broken "
+                                          f"references). Nothing was {verb}.")
         except DatabaseError as exc:
-            raise ValidationError("The backup could not be imported; your data was not "
+            raise ValidationError(f"The {source} could not be {verb}; your data was not "
                                   "changed.") from exc
-        logger.info("Imported a backup with %d rows", summary.total_rows)
+        return safety
+
+    # --------------------------------------------------------- safety copies
+
+    def safety_copies(self) -> list[SafetyCopy]:
+        """The safety copies next to the database, newest first."""
+        database_path = self._database.path
+        if database_path is None or not database_path.parent.is_dir():
+            return []
+        copies = []
+        for path in database_path.parent.glob(f"{database_path.stem}.backup-*.db"):
+            match = _SAFETY_NAME.match(path.name)
+            if match is None or match.group("stem") != database_path.stem:
+                continue
+            created = datetime.strptime(match.group("stamp"), "%Y%m%dT%H%M%SZ").replace(
+                tzinfo=UTC)
+            accounts, transactions = _peek_counts(path)
+            copies.append(SafetyCopy(path, match.group("reason"), created, path.stat().st_size,
+                                     accounts, transactions))
+        copies.sort(key=lambda copy: (copy.created_at, copy.path.name), reverse=True)
+        return copies
+
+    def restore_safety_copy(self, path: Path) -> ImportResult:
+        """Replace all data with a safety copy (after a safety copy of the current data)."""
+        path = _path(path)
+        known = {copy.path.resolve(): copy for copy in self.safety_copies()}
+        copy = known.get(path.resolve())
+        if copy is None:
+            raise ValidationError("Choose one of the safety copies listed.", "path")
+        converted, revision = _read_copy(copy.path)
+        safety = self._replace_all(converted, "before-restore", "safety copy", "restored")
+        counts = {name: len(rows) for name, rows in converted.items()}
+        summary = BackupSummary(path=copy.path, exported_at=copy.created_at.isoformat(),
+                                app_version="", schema_revision=revision,
+                                currency=None, counts=counts)
+        logger.info("Restored the safety copy %s (%d rows)", copy.path.name, summary.total_rows)
         report = self._check_consistency() if self._check_consistency is not None else None
         return ImportResult(summary, safety, report)
 
@@ -234,6 +317,52 @@ class DataService:
 
 
 # ---------------------------------------------------------------- helpers
+
+
+def _peek_counts(path: Path) -> tuple[int | None, int | None]:
+    """Accounts and transactions in a copy, read-only; (None, None) if unreadable."""
+    try:
+        connection = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+        try:
+            accounts = connection.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
+            transactions = connection.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+        finally:
+            connection.close()
+    except sqlite3.Error:
+        return None, None
+    return int(accounts), int(transactions)
+
+
+def _read_copy(path: Path) -> tuple[dict[str, list[dict[str, Any]]], str]:
+    """Every data row of a safety copy, upgraded to the current schema if needed.
+
+    The copy is duplicated into a temporary folder first, so it is never changed."""
+    with tempfile.TemporaryDirectory(prefix="money-manager-restore-") as folder:
+        working = Path(folder) / "copy.db"
+        try:
+            shutil.copy2(path, working)
+            check = sqlite3.connect(working)
+            try:
+                status = check.execute("PRAGMA integrity_check").fetchone()[0]
+            finally:
+                check.close()
+        except (OSError, sqlite3.Error) as exc:
+            raise ValidationError("This safety copy cannot be read.", "path") from exc
+        if status != "ok":
+            raise ValidationError("This safety copy is damaged and cannot be restored.", "path")
+        database = Database(f"sqlite:///{working.as_posix()}")
+        try:
+            database.initialize()  # upgrades an older copy; refuses a newer one
+            revision = current_revision(database.engine) or ""
+            with database.session() as session:
+                converted = {table.name: [dict(row._mapping) for row in session.execute(
+                    select(table).order_by(*table.primary_key.columns))]
+                    for table in data_tables()}
+        except MoneyManagerError as exc:
+            raise ValidationError(f"This safety copy cannot be restored: {exc}", "path") from exc
+        finally:
+            database.dispose()
+    return converted, revision
 
 
 def _path(value: object) -> Path:

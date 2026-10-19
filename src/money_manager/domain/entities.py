@@ -46,6 +46,20 @@ class Transaction:
 
 
 @dataclass(frozen=True, slots=True)
+class AccountTransfer:
+    """Money moved between two of the user's accounts (two linked adjustments)."""
+
+    id: int
+    from_account_id: int
+    to_account_id: int
+    amount: Money
+    occurred_on: date
+    description: str
+    out_transaction_id: int
+    in_transaction_id: int
+
+
+@dataclass(frozen=True, slots=True)
 class TransactionDraft:
     """Unvalidated input for creating or fully replacing a transaction."""
 

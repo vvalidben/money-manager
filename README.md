@@ -244,10 +244,13 @@ folder* button. You can use a different folder with `data_dir` or
 its program folder unless you configure that.
 
 The app writes safety copies automatically before a database upgrade
-(`backup-<revision>-<time>`), before importing a backup (`backup-before-import`)
-and before a reset (`backup-before-reset`). To restore one, close the app and
-copy it over `money_manager.db`. For your own backups, use **Settings → Export
-backup**. It writes one verified JSON file that *Import backup* can restore.
+(`backup-<revision>-<time>`), before importing a backup (`backup-before-import`),
+before a reset (`backup-before-reset`) and before restoring a copy
+(`backup-before-restore`). **Settings → Safety copies** lists them, with what
+each contains, and restores one. Your current data is saved as a new copy
+first, so a restore can be undone too. For your own backups, use
+**Settings → Export backup**. It writes one verified JSON file that *Import
+backup* can restore.
 
 ## Troubleshooting
 
@@ -643,6 +646,25 @@ else, which a test checks. The look follows the *Money Manager v3* design:
   orange, blue and yellow) and the blue/orange income-vs-expenses pair are
   validated for colour-vision deficiency and contrast on the tile surface.
   The design's pastels are too light to use as chart marks.
+- **Motion** (`ui/motion.py`):
+  - a short launch screen;
+  - tiles rise in one after another when a page opens;
+  - figures count up;
+  - bars and goal rings fill;
+  - the rail's highlight glides to the current page;
+  - a notice confirms each added, edited or deleted entry.
+
+  Every animation ends in exactly the still state; while a figure counts, code
+  and screen readers only ever see the exact value. Motion is off when it is
+  switched off in Settings → Appearance, when Windows' "Show animations in
+  Windows" is off, or with `MONEY_MANAGER_MOTION=off` (set for the tests).
+- **Details:**
+  - figures step down a size rather than being clipped;
+  - goal cards show progress rings in each goal's colour;
+  - transaction rows carry a badge in their category's colour (stable per id,
+    `theme.identity_color`);
+  - the dashboard has a "Renewing soon" tile with the next subscription
+    payments.
 
 Each page's main action sits in the page header;
 empty pages show one centred call to action. Paired cards sit side by side on
@@ -667,6 +689,43 @@ when nothing changed (`Database.revision`, `AppServices.freshness()`), and
 Statistics computed on a worker thread with an "Updating…" state (a newer
 range supersedes an older request). `PRAGMA optimize` runs when the database
 closes.
+
+## Transfers, budgets and safety copies
+
+**Transfers between accounts** (Transactions → *Transfer*, `AccountTransferService`)
+move money between two of your accounts, e.g. from the bank to the cash wallet.
+- A transfer is stored as two balance adjustments, out of one account and into
+  the other, tied together by an `account_transfers` row (migration 0009).
+  Totals therefore never change, and a transfer is never income, spending or
+  savings.
+- Both sides are created in one unit of work and deleted together. Neither side
+  can be edited or deleted alone; the database refuses that as well (RESTRICT).
+- The list shows them as *Transfer* with "To …" / "From …", and CSV exports
+  label them *Transfer out* / *Transfer in*.
+- *New account* on the same page adds the second account.
+
+**Budgets** (`domain/budgets.py`, `BudgetService`, migration 0010) are monthly
+limits per expense category. Each one compares the category's expenses in the
+current calendar month with the limit:
+
+| Status | Rule |
+|---|---|
+| Over | spent > limit |
+| Near limit | spent ≥ 85 % of the limit (exact comparison) |
+| On track | otherwise |
+
+From the 3rd day of the month, a projection shows the month-end spending at
+the pace so far. One budget per category; deleting an unused category deletes
+its budget.
+
+**Safety copies** (`DataService.safety_copies` / `restore_safety_copy`): only
+copies listed next to the database can be restored.
+- The copy is checked (`PRAGMA integrity_check`) and duplicated into a temporary
+  folder. Older copies are upgraded there first, so the copy itself is never
+  changed.
+- Its rows then replace all data exactly like an import: after a safety copy of
+  the current data, in one transaction, with references checked before
+  committing.
 
 ## Database migrations
 

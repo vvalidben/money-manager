@@ -2,6 +2,8 @@ import os
 
 # Must be set before any QApplication exists so tests run without a display.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# Still pages by default: tests read final values at once. Motion tests turn it on.
+os.environ.setdefault("MONEY_MANAGER_MOTION", "off")
 
 from collections.abc import Iterator  # noqa: E402
 from pathlib import Path  # noqa: E402

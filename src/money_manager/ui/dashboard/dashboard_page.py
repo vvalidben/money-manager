@@ -24,18 +24,29 @@ from money_manager.ui.charts.money import (
     category_spending_table,
     income_expense_table,
 )
-from money_manager.ui.dashboard.view_model import DashboardView, build_dashboard_view
+from money_manager.ui.dashboard.view_model import (
+    DashboardView,
+    RenewalView,
+    build_dashboard_view,
+    renewal_views,
+)
 from money_manager.ui.dashboard.widgets import (
     AllocationOverview,
     GoalsOverview,
     HealthCard,
     RecentTransactions,
+    RenewingSoon,
 )
 from money_manager.ui.goals.view_model import goal_card_view
 from money_manager.ui.pages.base_page import BasePage
-from money_manager.ui.pages.registry import GOALS_PAGE_KEY, TRANSACTIONS_PAGE_KEY, PageSpec
+from money_manager.ui.pages.registry import (
+    GOALS_PAGE_KEY,
+    SUBSCRIPTIONS_PAGE_KEY,
+    TRANSACTIONS_PAGE_KEY,
+    PageSpec,
+)
 from money_manager.ui.theme import SIDE_BY_SIDE_MIN_WIDTH, Spacing
-from money_manager.ui.transactions.rows import build_rows
+from money_manager.ui.transactions.rows import TransferSide, build_rows, transfer_sides
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +57,8 @@ class DashboardPage(BasePage):
         self._services = services
         self.overview: DashboardOverview | None = None
         self.view: DashboardView | None = None
+        self.renewals: tuple[RenewalView, ...] = ()
+        self.transfer_labels: dict[int, TransferSide] = {}
 
         self.stat_cards = tuple(StatCard("") for _ in range(4))
         self.flows_card = ChartCard(
@@ -68,6 +81,10 @@ class DashboardPage(BasePage):
         self.goals_card.view_all_requested.connect(
             lambda: self.navigate_requested.emit(GOALS_PAGE_KEY)
         )
+        self.renewing_card = RenewingSoon()
+        self.renewing_card.view_all_requested.connect(
+            lambda: self.navigate_requested.emit(SUBSCRIPTIONS_PAGE_KEY)
+        )
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(Spacing.MD)
@@ -78,11 +95,11 @@ class DashboardPage(BasePage):
             AdaptiveRow([(left, 7), (right, 5)], SIDE_BY_SIDE_MIN_WIDTH)
             for left, right in ((self.flows_card, self.allocation_card),
                                 (self.balance_card, self.spending_card),
-                                (self.recent_card, self.health_card))
+                                (self.recent_card, self.health_card),
+                                (self.goals_card, self.renewing_card))
         ]
         for row, pair in enumerate(self.pair_rows, start=1):
             grid.addWidget(pair, row, 0, 1, 12)
-        grid.addWidget(self.goals_card, 4, 0, 1, 12)
         for column in range(12):
             grid.setColumnStretch(column, 1)
 
@@ -112,7 +129,7 @@ class DashboardPage(BasePage):
         self.add_content(scroll, stretch=1)
         self._grid_widgets = [self.stats_row, self.flows_card, self.allocation_card,
                               self.balance_card, self.spending_card, self.recent_card,
-                              self.health_card, self.goals_card]
+                              self.health_card, self.goals_card, self.renewing_card]
 
     def on_shown(self) -> None:
         # Nothing changed since the page was last shown: keep what is on screen.
@@ -123,6 +140,10 @@ class DashboardPage(BasePage):
     def refresh(self) -> None:
         try:
             overview = self._services.dashboard.overview()
+            self.renewals = renewal_views(self._services.subscriptions.upcoming())
+            names = {account.id: account.name for account in self._services.accounts.list()}
+            self.transfer_labels = transfer_sides(
+                self._services.account_transfers.by_transaction(), names)
         except MoneyManagerError as exc:
             logger.warning("Could not load the dashboard: %s", exc)
             dialogs.show_warning(self, "Could not load the dashboard", str(exc))
@@ -159,7 +180,8 @@ class DashboardPage(BasePage):
         self.allocation_card.set_rows(view.allocation_rows, view.allocation_note)
         self.health_card.set_rows(view.health_rows)
         self.goals_card.set_goals([goal_card_view(goal) for goal in overview.goals])
+        self.renewing_card.set_rows(self.renewals)
         self.recent_card.set_rows(
             build_rows(overview.recent_transactions, overview.category_names,
-                       overview.allocation_names)
+                       overview.allocation_names, self.transfer_labels)
         )

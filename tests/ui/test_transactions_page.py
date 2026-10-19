@@ -124,8 +124,11 @@ class TestCrud:
             dialog.description_edit.setText("Salary")
 
         _patch_dialog(monkeypatch, fill)
+        notices: list[tuple[str, str]] = []
+        page.notice.connect(lambda title, detail: notices.append((title, detail)))
         page.add_button.click()
 
+        assert notices == [("Entry added", "+12,000.00 MAD · Salary")]
         assert _visible_descriptions(page) == ["Salary"]
         assert page.balance_card.value == "22,000.00 MAD"
         assert page.income_card.value == "+12,000.00 MAD"
@@ -184,8 +187,11 @@ class TestCrud:
         )
 
         _select_row(page, _visible_descriptions(page).index("Remove"))
+        notices: list[tuple[str, str]] = []
+        page.notice.connect(lambda title, detail: notices.append((title, detail)))
         page.delete_button.click()
 
+        assert notices == [("Entry deleted", "−50.00 MAD · Remove")]
         assert "Remove" in asked[0] and "cannot be undone" in asked[0]
         assert _visible_descriptions(page) == ["Keep"]
         assert page.balance_card.value == "9,700.00 MAD"

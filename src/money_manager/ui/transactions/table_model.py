@@ -6,14 +6,22 @@ page can ask the service for a correctly sorted (and paginated) result.
 
 from collections.abc import Sequence
 from enum import IntEnum
+from functools import lru_cache
 from typing import Any
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QPersistentModelIndex, Qt, Signal
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    QPersistentModelIndex,
+    QRectF,
+    Qt,
+    Signal,
+)
+from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
 
 from money_manager.domain.entities import Transaction
 from money_manager.domain.enums import TransactionSort
-from money_manager.ui.theme import Colors, mono_font
+from money_manager.ui.theme import FONT_FAMILY, Colors, identity_color, mono_font
 from money_manager.ui.transactions.rows import NO_DESCRIPTION, TransactionRow
 
 ModelIndex = QModelIndex | QPersistentModelIndex
@@ -101,6 +109,8 @@ class TransactionTableModel(QAbstractTableModel):
                     return QColor(Colors.TEXT_MUTED)
             case Qt.ItemDataRole.FontRole if column is Column.AMOUNT:
                 return self._amount_font
+            case Qt.ItemDataRole.DecorationRole if column is Column.DESCRIPTION:
+                return category_badge(_initial(row), identity_color(row.transaction.category_id))
             case Qt.ItemDataRole.TextAlignmentRole:
                 return _alignment(column)
             case Qt.ItemDataRole.ToolTipRole:
@@ -127,6 +137,35 @@ def _display(row: TransactionRow, column: Column) -> str:
             return row.type
         case Column.AMOUNT:
             return row.amount
+
+
+BADGE_SIZE = 24
+
+
+def _initial(row: TransactionRow) -> str:
+    text = row.description if row.description != NO_DESCRIPTION else row.category
+    return next((char.upper() for char in text if char.isalnum()), "·")
+
+
+@lru_cache(maxsize=512)
+def category_badge(letter: str, color: str, size: int = BADGE_SIZE, scale: int = 2) -> QPixmap:
+    """A rounded square in the category's colour with the entry's initial (cached)."""
+    pixmap = QPixmap(size * scale, size * scale)
+    pixmap.setDevicePixelRatio(scale)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor(color))
+    painter.drawRoundedRect(QRectF(0, 0, size, size), 7, 7)
+    font = QFont(FONT_FAMILY)
+    font.setPixelSize(size // 2)
+    font.setWeight(QFont.Weight.Bold)
+    painter.setFont(font)
+    painter.setPen(QColor(Colors.ON_ACCENT))
+    painter.drawText(QRectF(0, 0, size, size), Qt.AlignmentFlag.AlignCenter, letter)
+    painter.end()
+    return pixmap
 
 
 def _alignment(column: Column) -> Qt.AlignmentFlag:

@@ -1,9 +1,10 @@
-"""Dashboard cards: allocation overview, financial health, recent transactions."""
+"""Dashboard cards: allocation overview, financial health, recent transactions,
+renewals."""
 
 from collections.abc import Sequence
 from decimal import Decimal
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QGridLayout,
@@ -13,17 +14,18 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QTableView,
+    QVBoxLayout,
     QWidget,
 )
 
 from money_manager.ui.components.card import Card
-from money_manager.ui.dashboard.view_model import AllocationRowView, HealthRowView
+from money_manager.ui.dashboard.view_model import AllocationRowView, HealthRowView, RenewalView
 from money_manager.ui.goals.view_model import GoalCardView
 from money_manager.ui.theme import Spacing, set_style_property
 from money_manager.ui.transactions.rows import TransactionRow
-from money_manager.ui.transactions.table_model import Column, TransactionTableModel
+from money_manager.ui.transactions.table_model import BADGE_SIZE, Column, TransactionTableModel
 
-ROW_HEIGHT = 34
+ROW_HEIGHT = 40
 SHARE_BAR_STEPS = 1000
 
 
@@ -163,6 +165,7 @@ class RecentTransactions(Card):
         self.table.verticalHeader().hide()
         self.table.horizontalHeader().hide()
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
+        self.table.setIconSize(QSize(BADGE_SIZE, BADGE_SIZE))  # category badges
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setColumnHidden(Column.TYPE, True)
@@ -230,3 +233,66 @@ class GoalsOverview(Card):
             self._grid.addWidget(_label(view.deadline, "MutedLabel"), 4, column)
             self._grid.setColumnStretch(column, 1)
         self.empty_label.setVisible(not self.views)
+
+
+class RenewingSoon(Card):
+    """The next subscription payments on a pink tile, each with its date badge."""
+
+    view_all_requested = Signal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent=parent)
+        self.setObjectName("RenewingTile")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.body.setSpacing(Spacing.XS)
+
+        header = QHBoxLayout()
+        header.addWidget(_label("Renewing soon", "TileHeading"))
+        header.addStretch(1)
+        self.view_all_button = QPushButton("All subscriptions")
+        self.view_all_button.setObjectName("TilePill")
+        self.view_all_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.view_all_button.clicked.connect(self.view_all_requested)
+        header.addWidget(self.view_all_button)
+        self.body.addLayout(header)
+        self.body.addSpacing(Spacing.XS)
+
+        self._rows = QVBoxLayout()
+        self._rows.setSpacing(0)
+        self.body.addLayout(self._rows)
+        self.empty_label = _label("No payments due in the next 30 days.", "TileMuted")
+        self.body.addWidget(self.empty_label)
+        self.body.addStretch(1)
+        self.rows: tuple[RenewalView, ...] = ()
+
+    def set_rows(self, rows: Sequence[RenewalView]) -> None:
+        self.rows = tuple(rows)
+        while (item := self._rows.takeAt(0)) is not None:
+            if item.widget() is not None:
+                item.widget().deleteLater()
+        for row in self.rows:
+            self._rows.addWidget(self._row(row))
+        self.empty_label.setVisible(not self.rows)
+
+    @staticmethod
+    def _row(view: RenewalView) -> QWidget:
+        row = QWidget()
+        row.setObjectName("TileRow")
+        row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 9, 0, 9)
+        layout.setSpacing(12)
+        badge = _label(view.day, "DayBadge")
+        badge.setFixedSize(40, 40)
+        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(badge)
+        text = QVBoxLayout()
+        text.setSpacing(0)
+        text.addWidget(_label(view.name, "TileText"))
+        when = _label(view.when, "TileMuted")
+        set_style_property(when, "overdue", view.overdue)
+        text.addWidget(when)
+        layout.addLayout(text, 1)
+        layout.addWidget(_label(view.amount, "TileFigure"))
+        row.setAccessibleName(f"{view.name}, {view.when}, {view.amount}")
+        return row

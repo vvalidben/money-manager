@@ -2,8 +2,8 @@
 
 import logging
 
-from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QKeySequence, QShortcut, QShowEvent
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -19,7 +19,9 @@ from money_manager import APP_NAME
 from money_manager.core.config import AppConfig
 from money_manager.services import AppServices
 from money_manager.ui.advisor.advisor_page import AdvisorPage
+from money_manager.ui.budgets.budgets_page import BudgetsPage
 from money_manager.ui.components import StatCard
+from money_manager.ui.components.toast import Toast
 from money_manager.ui.dashboard.dashboard_page import DashboardPage
 from money_manager.ui.goals.goals_page import GoalsPage
 from money_manager.ui.investments.investments_page import InvestmentsPage
@@ -34,6 +36,7 @@ from money_manager.ui.navigation import (
 )
 from money_manager.ui.pages import (
     AI_ADVISOR_PAGE_KEY,
+    BUDGETS_PAGE_KEY,
     DASHBOARD_PAGE_KEY,
     DEFAULT_PAGE_KEY,
     GOALS_PAGE_KEY,
@@ -77,6 +80,7 @@ class MainWindow(QMainWindow):
         for spec in PAGES:
             page = self._create_page(spec, config, services)
             page.navigate_requested.connect(self.show_page)
+            page.notice.connect(self._show_notice)
             if isinstance(page, SettingsPage):
                 page.reload_requested.connect(self.reload_requested)
             self._pages[spec.key] = page
@@ -107,6 +111,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         central.installEventFilter(self)
 
+        self.toast = Toast(central)
         self._sidebar = Sidebar([NavItem(spec.key, spec.nav_label) for spec in PAGES], central)
         self._sidebar.page_selected.connect(self.show_page)
         self._global_controls = self._build_global_controls()
@@ -118,6 +123,8 @@ class MainWindow(QMainWindow):
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802
         if watched is self.centralWidget() and event.type() == QEvent.Type.Resize:
             self._sidebar.place(self.centralWidget().height())
+            if self.toast.isVisible():
+                self.toast.move(self.toast._resting_position())
         return super().eventFilter(watched, event)
 
     # ------------------------------------------------------------ global controls
@@ -239,7 +246,17 @@ class MainWindow(QMainWindow):
         if focused is not None and self._sidebar.isAncestorOf(focused):
             self._sidebar.button(key).setFocus()
         page.on_shown()
+        # After the layout has settled: tiles rise in, figures count, bars fill.
+        QTimer.singleShot(0, page, page.play_entrance)
         logger.debug("Showing page %s", key)
+
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802
+        super().showEvent(event)
+        page = self.current_page
+        QTimer.singleShot(0, page, page.play_entrance)
+
+    def _show_notice(self, title: str, detail: str) -> None:
+        self.toast.show_message(title, detail)
 
     @staticmethod
     def _create_page(spec: PageSpec, config: AppConfig, services: AppServices) -> BasePage:
@@ -257,6 +274,8 @@ class MainWindow(QMainWindow):
             return SubscriptionsPage(spec, services)
         if spec.key == INVESTMENTS_PAGE_KEY:
             return InvestmentsPage(spec, services)
+        if spec.key == BUDGETS_PAGE_KEY:
+            return BudgetsPage(spec, services)
         if spec.key == AI_ADVISOR_PAGE_KEY:
             return AdvisorPage(spec, services)
         return PlaceholderPage(spec)

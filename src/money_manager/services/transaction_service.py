@@ -14,7 +14,12 @@ from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
-from money_manager.core.errors import InsufficientFundsError, NotFoundError, ValidationError
+from money_manager.core.errors import (
+    ConflictError,
+    InsufficientFundsError,
+    NotFoundError,
+    ValidationError,
+)
 from money_manager.domain.entities import (
     Allocation,
     Category,
@@ -43,6 +48,7 @@ from money_manager.persistence.mappers import (
 from money_manager.persistence.models import TransactionModel
 from money_manager.persistence.repositories import (
     AccountRepository,
+    AccountTransferRepository,
     AllocationRepository,
     CategoryRepository,
     InvestmentRepository,
@@ -126,6 +132,7 @@ class TransactionService:
         with self._database.session() as session:
             model = _require(TransactionRepository(session), transaction_id)
             old = transaction_to_domain(model)
+            _check_transfer_link(session, model.id)
             _check_investment_link(session, model.id, draft)
             valid = self._validate(
                 session,
@@ -152,6 +159,7 @@ class TransactionService:
             repository = TransactionRepository(session)
             model = _require(repository, transaction_id)
             old = transaction_to_domain(model)
+            _check_transfer_link(session, model.id)
             _check_allocations(
                 session, _effects(old.allocation_id, old.type, old.amount, reverse=True)
             )
@@ -219,6 +227,18 @@ def _validate_query(query: TransactionQuery) -> TransactionFilter:
             f"Search text cannot be longer than {MAX_SEARCH_LENGTH} characters.", "search"
         )
     return replace(filters, search=search)
+
+
+TRANSFER_SIDE_MESSAGE = (
+    "This entry is one side of a transfer between your accounts. Delete the transfer to "
+    "remove both sides; to change it, delete it and record it again."
+)
+
+
+def _check_transfer_link(session: Session, transaction_id: int) -> None:
+    """Either side of an account transfer only changes together with the other."""
+    if AccountTransferRepository(session).for_transaction(transaction_id) is not None:
+        raise ConflictError(TRANSFER_SIDE_MESSAGE)
 
 
 def _check_investment_link(session: Session, transaction_id: int, draft: TransactionDraft) -> None:
