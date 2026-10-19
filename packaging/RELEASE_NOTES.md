@@ -1,10 +1,20 @@
-# Money Manager 1.1.0
+# Money Manager 1.2.0
 
 A local-first personal finance application for Windows. Your data stays in a
 database on your computer; nothing is sent anywhere unless you use online AI
 and confirm each request.
 
-## What's new in 1.1.0
+## What's new in 1.2.0
+
+- **Import your bank statement.** Transactions → *Import…* reads the CSV file
+  your bank exports, including French statements with *Débit* / *Crédit*
+  columns. You see every line before importing; lines already recorded are
+  skipped, so importing the same statement twice adds nothing.
+- **Money / Allocations page.** See what is set aside and what is Available;
+  add or take out money; rename, archive or restore allocations; and undo a
+  recent move.
+
+## New in 1.1.0
 
 - **New look.** Rounded tiles on a dark background, a colour for each page, an
   icon rail that opens when you point at it, and search, *Ask AI* and
@@ -26,13 +36,13 @@ and confirm each request.
   "Renewing soon" tile on the dashboard. Large figures now shrink to fit
   instead of being cut off.
 
-Your data is upgraded automatically the first time you start 1.1.0 (a safety
+Your data is upgraded automatically the first time you start a new version (a safety
 copy is saved first).
 
 ## What's included
 
 - **Accounts and transactions:** income, expenses, balance corrections and
-  transfers, with search, filters and CSV export. Amounts are exact to the
+  transfers, with search, filters, CSV export and bank statement import. Amounts are exact to the
   centime.
 - **Budgets:** monthly limits per spending category.
 - **Allocations:** set money aside (e.g. Holiday, Emergency fund) without
@@ -61,7 +71,7 @@ copy is saved first).
 
 ## Installing
 
-1. Extract `MoneyManager-1.1.0-windows-x64.zip` to a folder of your choice,
+1. Extract `MoneyManager-1.2.0-windows-x64.zip` to a folder of your choice,
    e.g. `%LOCALAPPDATA%\Programs\MoneyManager`.
 2. Start `MoneyManager.exe`. You can pin it to Start or the taskbar.
 3. Windows SmartScreen may warn about an unrecognised app because the
@@ -91,8 +101,6 @@ elsewhere (e.g. portable use), see `MoneyManager.example.ini`.
 
 ## Known limitations
 
-- The **Money / Allocations** page is still a placeholder. Allocations are
-  created and funded through goals, and transactions can be tagged to them.
 - The executable is not code-signed, so SmartScreen may warn the first time.
 - One currency for all amounts (MAD by default); there is no currency
   conversion.

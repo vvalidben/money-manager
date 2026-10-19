@@ -52,12 +52,12 @@ def test_database_revision_counts_committed_writes(database: Database,
 
 
 @pytest.mark.parametrize("key", [spec.key for spec in PAGES
-                                 if spec.key not in ("allocations", "settings")])
+                                 if spec.key != "settings"])
 def test_revisiting_an_unchanged_page_runs_no_queries(window: MainWindow, database: Database,
                                                       key: str) -> None:
     window.show_page(key)
     wait_until(lambda: not getattr(window.current_page, "loading", False))
-    window.show_page("allocations")
+    window.show_page("settings")
     assert count_queries(database, lambda: window.show_page(key)) <= 2  # AI status only
 
 
@@ -66,7 +66,7 @@ def test_changed_data_is_shown_on_the_next_visit(window: MainWindow,
     bank = app_services.accounts.create("Bank", opening_balance="100",
                                         opening_date=date(2026, 1, 1))
     window.show_page("dashboard")
-    window.show_page("allocations")
+    window.show_page("settings")
     salary = app_services.categories.create("Salary", CategoryKind.INCOME)
     app_services.transactions.create(TransactionDraft(bank.id, TransactionType.INCOME, "900",
                                                       fixed_today(), salary.id))

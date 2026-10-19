@@ -6,6 +6,7 @@ the page only decides what to display.
 
 import logging
 from dataclasses import replace
+from pathlib import Path
 
 from PySide6.QtCore import QItemSelectionModel, QSize, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -31,6 +32,7 @@ from money_manager.domain.entities import (
     TransactionQuery,
 )
 from money_manager.domain.enums import TransactionSort
+from money_manager.domain.statement import StatementTable
 from money_manager.services import AppServices
 from money_manager.ui import dialogs
 from money_manager.ui.accounts.account_dialog import AccountDialog
@@ -42,6 +44,7 @@ from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import FilterBar
 from money_manager.ui.transactions.rows import TransactionRow, build_rows, transfer_sides
 from money_manager.ui.transactions.table_model import BADGE_SIZE, Column, TransactionTableModel
+from money_manager.ui.transactions.import_dialog import ImportStatementDialog
 from money_manager.ui.transactions.transaction_dialog import TransactionDialog
 from money_manager.ui.transactions.transfer_dialog import TransferDialog
 
@@ -86,6 +89,10 @@ class TransactionsPage(BasePage):
         self.new_account_button.setToolTip("Add another account, e.g. cash or a card")
         self.new_account_button.clicked.connect(self.add_account)
         self.header.add_action(self.new_account_button)
+        self.import_button = QPushButton("Import…")
+        self.import_button.setToolTip("Import a bank statement (CSV file)")
+        self.import_button.clicked.connect(self.import_statement)
+        self.header.add_action(self.import_button)
         self._account_names: dict[int, str] = {}
 
         # Table
@@ -292,6 +299,35 @@ class TransactionsPage(BasePage):
                      f"{self._account_names.get(transfer.to_account_id, '?')}")
             self.notice.emit("Transfer recorded", f"{format_money(transfer.amount)} · {route}")
 
+    def import_statement(self) -> None:
+        path = self.ask_statement_path()
+        if path is None:
+            return
+        try:
+            table = self._services.statements.read(path)
+        except MoneyManagerError as exc:
+            dialogs.show_warning(self, "Could not read the statement", str(exc))
+            return
+        dialog = self.make_import_dialog(path, table)
+        if dialog.exec() != QDialog.DialogCode.Accepted or dialog.outcome is None:
+            return
+        outcome = dialog.outcome
+        self._after_change(None)
+        self.notice.emit("Statement imported", f"{outcome.imported} added · "
+                                               f"{outcome.duplicates} already recorded")
+        if outcome.problems:
+            listed = "\n".join(f"Line {p.row}: {p.message}" for p in outcome.problems[:10])
+            more = len(outcome.problems) - 10
+            dialogs.show_info(self, "Some lines were not imported",
+                              listed + (f"\n… and {more} more." if more > 0 else ""))
+
+    def ask_statement_path(self) -> Path | None:
+        return dialogs.ask_open_path(self, "Import bank statement", Path.home(),
+                                     "Bank statements (*.csv *.txt);;All files (*)")
+
+    def make_import_dialog(self, path: Path, table: StatementTable) -> ImportStatementDialog:
+        return ImportStatementDialog(self._services, path, table, parent=self)
+
     def add_account(self) -> None:
         dialog = self.make_account_dialog()
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -361,7 +397,7 @@ class TransactionsPage(BasePage):
     def _update_empty_state(self, page: TransactionPage) -> None:
         # Without an account there is nothing to summarise, filter or page through.
         for widget in (self.summary_row, self.filter_bar, self.footer, self.add_button,
-                       self.transfer_button, self.new_account_button):
+                       self.transfer_button, self.new_account_button, self.import_button):
             widget.setVisible(self._has_accounts)
         if not self._has_accounts:
             self.empty_state.set_content(

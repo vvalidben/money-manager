@@ -25,6 +25,7 @@ from money_manager.services.dashboard_service import DashboardService
 from money_manager.services.goal_service import GoalService
 from money_manager.services.investment_service import InvestmentService
 from money_manager.services.settings_service import SettingsService
+from money_manager.services.statement_import_service import StatementImportService
 from money_manager.services.statistics_service import StatisticsService
 from money_manager.services.subscription_service import SubscriptionService
 from money_manager.services.transaction_service import TransactionService
@@ -40,6 +41,7 @@ class AppServices:
     transfers: AllocationTransferService
     account_transfers: AccountTransferService
     budgets: BudgetService
+    statements: StatementImportService
     dashboard: DashboardService
     statistics: StatisticsService
     goals: GoalService
@@ -89,6 +91,7 @@ class AppServices:
             ),
             account_transfers=AccountTransferService(database, transactions, today=today),
             budgets=BudgetService(database, today=today, base_currency=base_currency),
+            statements=StatementImportService(database, transactions, today=today),
             dashboard=DashboardService(database, today=today, base_currency=base_currency),
             statistics=StatisticsService(database, today=today, base_currency=base_currency),
             goals=GoalService(database, today=today, base_currency=base_currency),

@@ -20,6 +20,7 @@ from money_manager.core.config import AppConfig
 from money_manager.services import AppServices
 from money_manager.ui.accounts.accounts_page import AccountsPage
 from money_manager.ui.advisor.advisor_page import AdvisorPage
+from money_manager.ui.allocations.allocations_page import AllocationsPage
 from money_manager.ui.budgets.budgets_page import BudgetsPage
 from money_manager.ui.components import StatCard
 from money_manager.ui.components.toast import Toast
@@ -38,6 +39,7 @@ from money_manager.ui.navigation import (
 from money_manager.ui.pages import (
     ACCOUNTS_PAGE_KEY,
     AI_ADVISOR_PAGE_KEY,
+    ALLOCATIONS_PAGE_KEY,
     BUDGETS_PAGE_KEY,
     DASHBOARD_PAGE_KEY,
     DEFAULT_PAGE_KEY,
@@ -278,6 +280,8 @@ class MainWindow(QMainWindow):
             return InvestmentsPage(spec, services)
         if spec.key == ACCOUNTS_PAGE_KEY:
             return AccountsPage(spec, services)
+        if spec.key == ALLOCATIONS_PAGE_KEY:
+            return AllocationsPage(spec, services)
         if spec.key == BUDGETS_PAGE_KEY:
             return BudgetsPage(spec, services)
         if spec.key == AI_ADVISOR_PAGE_KEY:

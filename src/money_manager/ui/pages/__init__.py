@@ -4,6 +4,7 @@ from money_manager.ui.pages.base_page import BasePage
 from money_manager.ui.pages.placeholder_page import PlaceholderPage
 from money_manager.ui.pages.registry import (
     ACCOUNTS_PAGE_KEY,
+    ALLOCATIONS_PAGE_KEY,
     AI_ADVISOR_PAGE_KEY,
     BUDGETS_PAGE_KEY,
     DASHBOARD_PAGE_KEY,
@@ -21,6 +22,7 @@ from money_manager.ui.pages.settings_page import SettingsPage
 
 __all__ = [
     "ACCOUNTS_PAGE_KEY",
+    "ALLOCATIONS_PAGE_KEY",
     "AI_ADVISOR_PAGE_KEY",
     "BUDGETS_PAGE_KEY",
     "DASHBOARD_PAGE_KEY",

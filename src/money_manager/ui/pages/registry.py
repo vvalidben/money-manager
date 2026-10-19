@@ -19,6 +19,7 @@ DEFAULT_PAGE_KEY = DASHBOARD_PAGE_KEY
 SETTINGS_PAGE_KEY = "settings"
 TRANSACTIONS_PAGE_KEY = "transactions"
 BUDGETS_PAGE_KEY = "budgets"
+ALLOCATIONS_PAGE_KEY = "allocations"
 STATISTICS_PAGE_KEY = "statistics"
 GOALS_PAGE_KEY = "goals"
 SUBSCRIPTIONS_PAGE_KEY = "subscriptions"
@@ -65,11 +66,11 @@ PAGES: tuple[PageSpec, ...] = (
         placeholder_message="Set a monthly limit for a spending category.",
     ),
     PageSpec(
-        key="allocations",
+        key=ALLOCATIONS_PAGE_KEY,
         nav_label="Money / Allocations",
         title="Money / Allocations",
-        subtitle="Organise the money you already have into purposes.",
-        placeholder_heading="Allocations are on the way",
+        subtitle="Set money aside for purposes; what is left is Available to spend.",
+        placeholder_heading="Nothing set aside yet",
         placeholder_message=(
             "You will be able to reserve money for savings, bills, investments and more. "
             "Moving money between allocations never changes your total balance."
