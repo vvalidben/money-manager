@@ -12,6 +12,7 @@ from money_manager.ui.components import FormField
 from money_manager.ui.formatting import format_money
 from money_manager.ui.goals.goal_dialog import amount_edit
 from money_manager.ui.theme import Spacing
+from money_manager.core.i18n import tr
 
 
 class AmountAction(StrEnum):
@@ -35,9 +36,9 @@ class GoalAmountDialog(QDialog):
         self.saved: GoalProgress | None = None
         name = goal.goal.name
 
-        titles = {AmountAction.ADD: f"Add money to {name}",
-                  AmountAction.WITHDRAW: f"Withdraw from {name}",
-                  AmountAction.SET: f"Update {name}"}
+        titles = {AmountAction.ADD: tr("Add money to {0}", name),
+                  AmountAction.WITHDRAW: tr("Withdraw from {0}", name),
+                  AmountAction.SET: tr("Update {0}", name)}
         self.setWindowTitle(titles[action])
         self.setModal(True)
         self.setMinimumWidth(420)
@@ -48,15 +49,15 @@ class GoalAmountDialog(QDialog):
         self.amount_edit = amount_edit()
         if action is AmountAction.SET:
             self.amount_edit.setText(f"{goal.saved.amount}")
-        label = "Amount saved so far" if action is AmountAction.SET else "Amount"
+        label = tr("Amount saved so far") if action is AmountAction.SET else tr("Amount")
         self.field = FormField(f"{label} ({services.base_currency})", self.amount_edit)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        ok.setText({AmountAction.ADD: "Add money", AmountAction.WITHDRAW: "Withdraw",
-                    AmountAction.SET: "Save"}[action])
+        ok.setText({AmountAction.ADD: tr("Add money"), AmountAction.WITHDRAW: tr("Withdraw"),
+                    AmountAction.SET: tr("Save")}[action])
         ok.setObjectName("PrimaryButton")
         buttons.accepted.connect(self.submit)
         buttons.rejected.connect(self.reject)
@@ -72,17 +73,17 @@ class GoalAmountDialog(QDialog):
         goal = self._goal
         allocation = goal.allocation_name or "?"
         if self.action is AmountAction.SET:
-            return ("Record how much you have saved for this goal outside the app. "
-                    "This amount is not part of your balance.")
+            return (tr("Record how much you have saved for this goal outside the app. "
+                    "This amount is not part of your balance."))
         if goal.goal.is_manual:
-            verb = "Increase" if self.action is AmountAction.ADD else "Decrease"
-            return f"{verb} the amount recorded for this goal. Your balance is not affected."
+            verb = tr("Increase") if self.action is AmountAction.ADD else tr("Decrease")
+            return tr("{0} the amount recorded for this goal. Your balance is not affected.", verb)
         if self.action is AmountAction.ADD:
             available = self._services.allocations.available()
-            return (f"Moves money from Available ({format_money(available)}) into the "
-                    f"allocation “{allocation}”. Your total balance does not change.")
-        return (f"Moves money from the allocation “{allocation}” ({format_money(goal.current)}) "
-                "back to Available. Your total balance does not change.")
+            return (tr("Moves money from Available ({0}) into the allocation “{1}”. Your total "
+                       "balance does not change.", format_money(available), allocation))
+        return (tr("Moves money from the allocation “{0}” ({1}) back to Available. Your "
+                   "total balance does not change.", allocation, format_money(goal.current)))
 
     def submit(self) -> bool:
         self.field.set_error(None)

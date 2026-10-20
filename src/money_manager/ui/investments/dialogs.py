@@ -34,6 +34,7 @@ from money_manager.ui.goals.goal_dialog import amount_edit
 from money_manager.ui.investments.view_model import KIND_TEXT
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import to_qdate
+from money_manager.core.i18n import tr
 
 
 class _FormDialog(QDialog):
@@ -114,32 +115,32 @@ def _date_edit(services: AppServices) -> QDateEdit:
 def _note_edit() -> QLineEdit:
     edit = QLineEdit()
     edit.setMaxLength(MAX_INVESTMENT_NOTE_LENGTH)
-    edit.setPlaceholderText("Optional")
+    edit.setPlaceholderText(tr("Optional"))
     return edit
 
 
 class InvestmentDialog(_FormDialog):
     def __init__(self, services: AppServices, *, position: InvestmentPosition | None = None,
                  parent: QWidget | None = None) -> None:
-        super().__init__("Edit investment" if position else "New investment",
-                         "Save changes" if position else "Add investment", parent)
+        super().__init__(tr("Edit investment") if position else tr("New investment"),
+                         tr("Save changes") if position else tr("Add investment"), parent)
         self._services = services
         self._original = position
         self.saved: InvestmentPosition | None = None
 
         self.name_edit = QLineEdit()
         self.name_edit.setMaxLength(MAX_INVESTMENT_NAME_LENGTH)
-        self.name_edit.setPlaceholderText("e.g. MSCI World ETF")
+        self.name_edit.setPlaceholderText(tr("e.g. MSCI World ETF"))
         self.kind_combo = QComboBox()
         for kind, label in KIND_TEXT.items():
             self.kind_combo.addItem(label, kind.value)
         self.notes_edit = QPlainTextEdit()
         self.notes_edit.setFixedHeight(60)
-        self.notes_edit.setPlaceholderText("Optional — broker, wallet, where the gold is kept …")
-        self.add_field("name", FormField("Name", self.name_edit))
-        self.add_field("kind", FormField("Type", self.kind_combo))
-        self.add_field("notes", FormField("Notes", self.notes_edit))
-        self.add_text("Values are entered by you — the app does not fetch market prices.")
+        self.notes_edit.setPlaceholderText(tr("Optional — broker, wallet, where the gold is kept …"))
+        self.add_field("name", FormField(tr("Name"), self.name_edit))
+        self.add_field("kind", FormField(tr("Type"), self.kind_combo))
+        self.add_field("notes", FormField(tr("Notes"), self.notes_edit))
+        self.add_text(tr("Values are entered by you — the app does not fetch market prices."))
         self.finish()
 
         if position is not None:
@@ -174,7 +175,7 @@ class EntryDialog(_FormDialog):
         name = position.investment.name
         is_contribution = kind is EntryKind.CONTRIBUTION
         super().__init__(f"{'Add contribution to' if is_contribution else 'Withdraw from'} {name}",
-                         "Add contribution" if is_contribution else "Record withdrawal", parent)
+                         tr("Add contribution") if is_contribution else tr("Record withdrawal"), parent)
         self._services = services
         self._position = position
         self.kind = kind
@@ -182,21 +183,21 @@ class EntryDialog(_FormDialog):
         self.amount_edit = amount_edit()
         self.date_edit = _date_edit(services)
         self.note_edit = _note_edit()
-        self.add_field("amount", FormField(f"Amount ({services.base_currency})", self.amount_edit))
-        self.add_field("occurred_on", FormField("Date", self.date_edit))
-        self.add_field("note", FormField("Note", self.note_edit))
+        self.add_field("amount", FormField(tr("Amount ({0})", services.base_currency), self.amount_edit))
+        self.add_field("occurred_on", FormField(tr("Date"), self.date_edit))
+        self.add_field("note", FormField(tr("Note"), self.note_edit))
 
         if is_contribution:
             self.from_account_check = QCheckBox(
-                "Paid from one of my accounts (records an investment expense)")
+                tr("Paid from one of my accounts (records an investment expense)"))
             self._layout.addWidget(self.from_account_check)
             self.account_combo = QComboBox()
             for account in services.accounts.list():
                 self.account_combo.addItem(account.name, account.id)
-            self.account_combo.setPlaceholderText("No accounts yet")
+            self.account_combo.setPlaceholderText(tr("No accounts yet"))
             self.category_combo = QComboBox()
             self.new_category_button = QToolButton()
-            self.new_category_button.setText("New…")
+            self.new_category_button.setText(tr("New…"))
             self.new_category_button.clicked.connect(self._prompt_new_category)
             category_row = QWidget()
             row_layout = QHBoxLayout(category_row)
@@ -204,22 +205,22 @@ class EntryDialog(_FormDialog):
             row_layout.addWidget(self.category_combo, 1)
             row_layout.addWidget(self.new_category_button)
             self.allocation_combo = QComboBox()
-            self.allocation_combo.addItem("Available (not allocated)", None)
+            self.allocation_combo.addItem(tr("Available (not allocated)"), None)
             for allocation in services.allocations.list():
                 self.allocation_combo.addItem(allocation.name, allocation.id)
-            self.add_field("account_id", FormField("From account", self.account_combo))
-            self.add_field("category_id", FormField("Investment category", category_row,
+            self.add_field("account_id", FormField(tr("From account"), self.account_combo))
+            self.add_field("category_id", FormField(tr("Investment category"), category_row,
                                                     highlight=self.category_combo))
-            self.add_field("allocation_id", FormField("Paid from", self.allocation_combo))
+            self.add_field("allocation_id", FormField(tr("Paid from"), self.allocation_combo))
             self.hint = self.add_text("")
             self.from_account_check.toggled.connect(self._update_source)
             self.from_account_check.setChecked(bool(services.accounts.list()))
             self._reload_categories(None)
             self._update_source()
         else:
-            self.add_text("A withdrawal lowers the amount invested. It does not change your "
+            self.add_text(tr("A withdrawal lowers the amount invested. It does not change your "
                           "balance: if the money came back to one of your accounts, record that "
-                          "as a transaction too.")
+                          "as a transaction too."))
         self.finish()
 
     def create_category(self, name: str) -> None:
@@ -228,7 +229,7 @@ class EntryDialog(_FormDialog):
             category = self._services.categories.create(name, CategoryKind.EXPENSE)
             self._services.categories.set_investment(category.id, True)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not create category", str(exc))
+            dialogs.show_warning(self, tr("Could not create category"), str(exc))
             return
         self._reload_categories(category.id)
 
@@ -245,7 +246,7 @@ class EntryDialog(_FormDialog):
             elif self.from_account_check.isChecked():
                 account_id = self.account_combo.currentData()
                 if account_id is None:
-                    raise ValidationError("Choose an account.", "account_id")
+                    raise ValidationError(tr("Choose an account."), "account_id")
                 service.add_contribution(
                     investment_id, amount, on, note=note, account_id=account_id,
                     category_id=self.category_combo.currentData(),
@@ -261,11 +262,11 @@ class EntryDialog(_FormDialog):
         for key in ("account_id", "category_id", "allocation_id"):
             self.fields[key].setVisible(paid)
         self.hint.setText(
-            "Records one expense in the investment category, so your balance goes down and the "
-            "statistics count it as investing."
+            tr("Records one expense in the investment category, so your balance goes down and the "
+            "statistics count it as investing.")
             if paid else
-            "External money (e.g. invested before you started tracking): your balance does not "
-            "change."
+            tr("External money (e.g. invested before you started tracking): your balance does not "
+            "change.")
         )
 
     def _reload_categories(self, select_id: int | None) -> None:
@@ -273,12 +274,12 @@ class EntryDialog(_FormDialog):
         for category in self._services.categories.list(CategoryKind.EXPENSE):
             if category.is_investment:
                 self.category_combo.addItem(category.name, category.id)
-        self.category_combo.setPlaceholderText("No investment categories — click New…")
+        self.category_combo.setPlaceholderText(tr("No investment categories — click New…"))
         index = self.category_combo.findData(select_id) if select_id is not None else 0
         self.category_combo.setCurrentIndex(index if index >= 0 else 0)
 
     def _prompt_new_category(self) -> None:
-        name, accepted = QInputDialog.getText(self, "New investment category", "Category name:")
+        name, accepted = QInputDialog.getText(self, tr("New investment category"), tr("Category name:"))
         if accepted and name.strip():
             self.create_category(name)
 
@@ -286,20 +287,20 @@ class EntryDialog(_FormDialog):
 class ValueDialog(_FormDialog):
     def __init__(self, services: AppServices, position: InvestmentPosition,
                  parent: QWidget | None = None) -> None:
-        super().__init__(f"Update value · {position.investment.name}", "Save value", parent)
+        super().__init__(tr("Update value · {0}", position.investment.name), tr("Save value"), parent)
         self._services = services
         self._position = position
-        self.add_text("Enter what the investment is worth, e.g. from your broker's app. "
-                      "A value entered for the same day replaces the earlier one.")
+        self.add_text(tr("Enter what the investment is worth, e.g. from your broker's app. "
+                      "A value entered for the same day replaces the earlier one."))
         self.value_edit = amount_edit()
         if position.current_value is not None:
             self.value_edit.setText(f"{position.current_value.amount}")
         self.date_edit = _date_edit(services)
         self.note_edit = _note_edit()
-        self.add_field("value", FormField(f"Current value ({services.base_currency})",
+        self.add_field("value", FormField(tr("Current value ({0})", services.base_currency),
                                           self.value_edit))
-        self.add_field("valued_on", FormField("Value on", self.date_edit))
-        self.add_field("note", FormField("Note", self.note_edit))
+        self.add_field("valued_on", FormField(tr("Value on"), self.date_edit))
+        self.add_field("note", FormField(tr("Note"), self.note_edit))
         self.finish()
 
     def submit(self) -> bool:

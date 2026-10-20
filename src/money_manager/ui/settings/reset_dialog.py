@@ -15,6 +15,7 @@ from money_manager.services import AppServices
 from money_manager.services.data_service import RESET_CONFIRMATION, ResetResult
 from money_manager.ui.components import FormField
 from money_manager.ui.theme import Spacing
+from money_manager.core.i18n import tr
 
 
 class ResetDialog(QDialog):
@@ -22,27 +23,27 @@ class ResetDialog(QDialog):
         super().__init__(parent)
         self._services = services
         self.result_info: ResetResult | None = None
-        self.setWindowTitle("Reset all data")
+        self.setWindowTitle(tr("Reset all data"))
         self.setModal(True)
         self.setMinimumWidth(520)
 
-        heading = QLabel("Delete all of your data?")
+        heading = QLabel(tr("Delete all of your data?"))
         heading.setObjectName("CardHeading")
         warning = QLabel(
-            "This deletes every account, transaction, allocation, goal, subscription, "
+            tr("This deletes every account, transaction, allocation, goal, subscription, "
             "investment, setting and AI insight. A safety backup of the database is written "
-            "next to it first. Export a backup yourself if you want to keep a copy elsewhere.")
+            "next to it first. Export a backup yourself if you want to keep a copy elsewhere."))
         warning.setObjectName("FormError")
         warning.setWordWrap(True)
 
         self.confirm_edit = QLineEdit()
         self.confirm_edit.setPlaceholderText(RESET_CONFIRMATION)
-        self.confirm_field = FormField(f"Type {RESET_CONFIRMATION} to confirm",
+        self.confirm_field = FormField(tr("Type {0} to confirm", RESET_CONFIRMATION),
                                        self.confirm_edit)
-        self.remove_key = QCheckBox("Also remove the saved Anthropic API key")
+        self.remove_key = QCheckBox(tr("Also remove the saved Anthropic API key"))
 
         buttons = QDialogButtonBox()
-        self.reset_button = buttons.addButton("Delete all data",
+        self.reset_button = buttons.addButton(tr("Delete all data"),
                                               QDialogButtonBox.ButtonRole.DestructiveRole)
         self.reset_button.setObjectName("DangerButton")
         self.reset_button.setEnabled(False)

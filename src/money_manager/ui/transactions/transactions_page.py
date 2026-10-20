@@ -47,8 +47,10 @@ from money_manager.ui.transactions.filter_bar import FilterBar
 from money_manager.ui.transactions.rows import TransactionRow, build_rows, transfer_sides
 from money_manager.ui.transactions.table_model import BADGE_SIZE, Column, TransactionTableModel
 from money_manager.ui.transactions.import_dialog import ImportStatementDialog
+from money_manager.ui.transactions.receipts_dialog import ReceiptsDialog
 from money_manager.ui.transactions.transaction_dialog import TransactionDialog
 from money_manager.ui.transactions.transfer_dialog import TransferDialog
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +69,9 @@ class TransactionsPage(BasePage):
         self._allocations: list[Allocation] = []
 
         # Summary figures
-        self.balance_card = StatCard("Total balance", compact=True)
-        self.income_card = StatCard("Income in view", compact=True)
-        self.expenses_card = StatCard("Expenses in view", compact=True)
+        self.balance_card = StatCard(tr("Total balance"), compact=True)
+        self.income_card = StatCard(tr("Income in view"), compact=True)
+        self.expenses_card = StatCard(tr("Expenses in view"), compact=True)
         self.summary_row = ResponsiveRow(
             (self.balance_card, self.income_card, self.expenses_card), min_item_width=190)
 
@@ -77,27 +79,27 @@ class TransactionsPage(BasePage):
         self.filter_bar = FilterBar(services.today)
         self.filter_bar.changed.connect(self._on_filters_changed)
         self.search_field = self.filter_bar.search_edit
-        self.add_button = QPushButton("Add transaction")
+        self.add_button = QPushButton(tr("Add transaction"))
         self.add_button.setObjectName("PrimaryButton")
         self.add_button.clicked.connect(self.add_transaction)
-        self.add_button.setToolTip("Add transaction (Ctrl+N)")
+        self.add_button.setToolTip(tr("Add transaction (Ctrl+N)"))
         self.header.add_action(self.add_button)
         self.primary_button = self.add_button
-        self.transfer_button = QPushButton("Transfer")
-        self.transfer_button.setToolTip("Move money between two of your accounts")
+        self.transfer_button = QPushButton(tr("Transfer"))
+        self.transfer_button.setToolTip(tr("Move money between two of your accounts"))
         self.transfer_button.clicked.connect(self.transfer_between_accounts)
         self.header.add_action(self.transfer_button)
-        self.new_account_button = QPushButton("New account")
-        self.new_account_button.setToolTip("Add another account, e.g. cash or a card")
+        self.new_account_button = QPushButton(tr("New account"))
+        self.new_account_button.setToolTip(tr("Add another account, e.g. cash or a card"))
         self.new_account_button.clicked.connect(self.add_account)
         self.header.add_action(self.new_account_button)
-        self.import_button = QPushButton("Import…")
-        self.import_button.setToolTip("Import a bank statement (CSV file)")
+        self.import_button = QPushButton(tr("Import…"))
+        self.import_button.setToolTip(tr("Import a bank statement (CSV file)"))
         self.import_button.clicked.connect(self.import_statement)
         self.header.add_action(self.import_button)
-        self.recurring_button = QPushButton("Recurring…")
+        self.recurring_button = QPushButton(tr("Recurring…"))
         self.recurring_button.setToolTip(
-            "Income and expenses recorded automatically, e.g. salary or rent")
+            tr("Income and expenses recorded automatically, e.g. salary or rent"))
         self.recurring_button.clicked.connect(self.manage_recurring)
         self.header.add_action(self.recurring_button)
         self._account_names: dict[int, str] = {}
@@ -145,17 +147,21 @@ class TransactionsPage(BasePage):
         # Row actions and paging
         self.result_label = QLabel()
         self.result_label.setObjectName("MutedLabel")
-        self.edit_button = QPushButton("Edit")
+        self.edit_button = QPushButton(tr("Edit"))
         self.edit_button.clicked.connect(self.edit_selected)
-        self.delete_button = QPushButton("Delete")
+        self.delete_button = QPushButton(tr("Delete"))
         self.delete_button.setObjectName("DangerButton")
         self.delete_button.clicked.connect(self.delete_selected)
-        self.previous_button = QPushButton("‹ Previous")
+        self.receipts_button = QPushButton(tr("Receipts\u2026"))
+        self.receipts_button.setToolTip(tr("Attach a photo or PDF of the receipt"))
+        self.receipts_button.clicked.connect(self.manage_receipts)
+        self.previous_button = QPushButton(tr("‹ Previous"))
         self.previous_button.clicked.connect(lambda: self._go_to_offset(-PAGE_SIZE))
-        self.next_button = QPushButton("Next ›")
+        self.next_button = QPushButton(tr("Next ›"))
         self.next_button.clicked.connect(lambda: self._go_to_offset(PAGE_SIZE))
         self.footer = _hbox(
             self.result_label,
+            self.receipts_button,
             self.edit_button,
             self.delete_button,
             self.previous_button,
@@ -192,8 +198,8 @@ class TransactionsPage(BasePage):
         self._account_names = {account.id: account.name for account in accounts}
         self.transfer_button.setEnabled(len(accounts) > 1)
         self.transfer_button.setToolTip(
-            "Move money between two of your accounts" if len(accounts) > 1
-            else "Add a second account (New account) to transfer between them")
+            tr("Move money between two of your accounts") if len(accounts) > 1
+            else tr("Add a second account (New account) to transfer between them"))
         self.filter_bar.set_accounts(accounts)
         self._categories = self._services.categories.list(include_archived=True)
         self.filter_bar.set_categories(self._categories)
@@ -221,7 +227,7 @@ class TransactionsPage(BasePage):
         dialog = self.make_transaction_dialog(None)
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved is not None:
             self._after_change(dialog.saved.id)
-            self._announce("Entry added", dialog.saved.id)
+            self._announce(tr("Entry added"), dialog.saved.id)
 
     def selected_row(self) -> TransactionRow | None:
         rows = self.table.selectionModel().selectedRows()
@@ -233,9 +239,9 @@ class TransactionsPage(BasePage):
             return
         row = self.selected_row()
         if row is not None and row.transfer_id is not None:
-            dialogs.show_info(self, "Transfers cannot be edited",
-                              "This entry is one side of a transfer between your accounts. "
-                              "To change it, delete the transfer and record it again.")
+            dialogs.show_info(self, tr("Transfers cannot be edited"),
+                              tr("This entry is one side of a transfer between your accounts. "
+                              "To change it, delete the transfer and record it again."))
             return
         dialog = self.make_transaction_dialog(transaction)
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved is not None:
@@ -243,11 +249,11 @@ class TransactionsPage(BasePage):
             self._after_change(saved.id)
             rule = self._learn_rule(transaction, saved)
             if rule is None:
-                self._announce("Entry updated", saved.id)
+                self._announce(tr("Entry updated"), saved.id)
             else:
                 name = next((c.name for c in self._categories if c.id == rule.category_id), "?")
-                self.notice.emit("Entry updated · rule learned",
-                                 f"\u201c{rule.keyword}\u201d goes to {name} from now on")
+                self.notice.emit(tr("Entry updated · rule learned"),
+                                 tr("“{0}” goes to {1} from now on", rule.keyword, name))
 
     def delete_selected(self) -> None:
         transaction = self.selected_transaction()
@@ -258,18 +264,18 @@ class TransactionsPage(BasePage):
             self._delete_transfer(row)
             return
         message = (
-            f"Delete this transaction?\n\n{row.date} · {row.description} · {row.amount}\n\n"
-            "Your balance will be recalculated. This cannot be undone."
+            tr("Delete this transaction?\n\n{0} · {1} · {2}\n\nYour balance will be "
+               "recalculated. This cannot be undone.", row.date, row.description, row.amount)
         )
-        if not dialogs.confirm_destructive(self, "Delete transaction", message):
+        if not dialogs.confirm_destructive(self, tr("Delete transaction"), message):
             return
         try:
             self._services.transactions.delete(transaction.id)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not delete transaction", str(exc))
+            dialogs.show_warning(self, tr("Could not delete transaction"), str(exc))
             return
         self._after_change(None)
-        self.notice.emit("Entry deleted", f"{row.amount} · {row.description}")
+        self.notice.emit(tr("Entry deleted"), f"{row.amount} · {row.description}")
 
     def _learn_rule(self, before: Transaction, after: Transaction) -> CategoryRule | None:
         """A corrected category teaches a rule for future imports (and stays a rule)."""
@@ -296,24 +302,23 @@ class TransactionsPage(BasePage):
         route = (f"{self._account_names.get(transfer.from_account_id, '?')} → "
                  f"{self._account_names.get(transfer.to_account_id, '?')}")
         amount = format_money(transfer.amount)
-        message = (f"Delete this transfer?\n\n{row.date} · {route} · {amount}\n\n"
-                   "Both sides are removed and both balances are recalculated. "
-                   "This cannot be undone.")
-        if not dialogs.confirm_destructive(self, "Delete transfer", message):
+        message = (tr("Delete this transfer?\n\n{0} · {1} · {2}\n\nBoth sides are removed and both "
+                      "balances are recalculated. This cannot be undone.", row.date, route, amount))
+        if not dialogs.confirm_destructive(self, tr("Delete transfer"), message):
             return
         try:
             self._services.account_transfers.delete(transfer.id)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not delete the transfer", str(exc))
+            dialogs.show_warning(self, tr("Could not delete the transfer"), str(exc))
             return
         self._after_change(None)
-        self.notice.emit("Transfer deleted", f"{amount} · {route}")
+        self.notice.emit(tr("Transfer deleted"), f"{amount} · {route}")
 
     def transfer_between_accounts(self) -> None:
         if len(self._account_names) < 2:
-            dialogs.show_info(self, "Add a second account",
-                              "A transfer moves money between two of your accounts. Add the "
-                              "other account first (New account), e.g. your cash or a card.")
+            dialogs.show_info(self, tr("Add a second account"),
+                              tr("A transfer moves money between two of your accounts. Add the "
+                              "other account first (New account), e.g. your cash or a card."))
             return
         dialog = self.make_transfer_dialog()
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved is not None:
@@ -321,7 +326,19 @@ class TransactionsPage(BasePage):
             self._after_change(transfer.out_transaction_id)
             route = (f"{self._account_names.get(transfer.from_account_id, '?')} → "
                      f"{self._account_names.get(transfer.to_account_id, '?')}")
-            self.notice.emit("Transfer recorded", f"{format_money(transfer.amount)} · {route}")
+            self.notice.emit(tr("Transfer recorded"), f"{format_money(transfer.amount)} · {route}")
+
+    def manage_receipts(self) -> None:
+        transaction = self.selected_transaction()
+        if transaction is None:
+            return
+        dialog = self.make_receipts_dialog(transaction)
+        dialog.exec()
+        if dialog.changed:
+            self._after_change(transaction.id)
+
+    def make_receipts_dialog(self, transaction: Transaction) -> ReceiptsDialog:
+        return ReceiptsDialog(self._services, transaction, parent=self)
 
     def manage_recurring(self) -> None:
         dialog = self.make_recurring_dialog()
@@ -339,24 +356,24 @@ class TransactionsPage(BasePage):
         try:
             table = self._services.statements.read(path)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not read the statement", str(exc))
+            dialogs.show_warning(self, tr("Could not read the statement"), str(exc))
             return
         dialog = self.make_import_dialog(path, table)
         if dialog.exec() != QDialog.DialogCode.Accepted or dialog.outcome is None:
             return
         outcome = dialog.outcome
         self._after_change(None)
-        self.notice.emit("Statement imported", f"{outcome.imported} added · "
-                                               f"{outcome.duplicates} already recorded")
+        self.notice.emit(tr("Statement imported"), tr("{0} added · {1} already recorded", outcome.imported, outcome.duplicates))
         if outcome.problems:
             listed = "\n".join(f"Line {p.row}: {p.message}" for p in outcome.problems[:10])
             more = len(outcome.problems) - 10
-            dialogs.show_info(self, "Some lines were not imported",
-                              listed + (f"\n… and {more} more." if more > 0 else ""))
+            dialogs.show_info(self, tr("Some lines were not imported"),
+                              listed + (tr("\n… and {0} more.", more) if more > 0 else ""))
 
     def ask_statement_path(self) -> Path | None:
-        return dialogs.ask_open_path(self, "Import bank statement", Path.home(),
-                                     "Bank statements (*.csv *.txt);;All files (*)")
+        return dialogs.ask_open_path(self, tr("Import bank statement"), Path.home(),
+                                     f"{tr('Bank statements')} (*.csv *.txt);;"
+                                     f"{tr('All files')} (*)")
 
     def make_import_dialog(self, path: Path, table: StatementTable) -> ImportStatementDialog:
         return ImportStatementDialog(self._services, path, table, parent=self)
@@ -366,7 +383,7 @@ class TransactionsPage(BasePage):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.reload()
             saved = getattr(dialog, "saved", None)
-            self.notice.emit("Account created", saved.name if saved is not None else "")
+            self.notice.emit(tr("Account created"), saved.name if saved is not None else "")
 
     def create_account(self) -> None:
         dialog = self.make_account_dialog()
@@ -396,13 +413,19 @@ class TransactionsPage(BasePage):
                                    self._account_names)
         except MoneyManagerError as exc:
             logger.warning("Could not load transactions: %s", exc)
-            dialogs.show_warning(self, "Could not load transactions", str(exc))
+            dialogs.show_warning(self, tr("Could not load transactions"), str(exc))
             return
         self._page = page
 
         category_names = {c.id: c.name for c in self._categories}
         allocation_names = {a.id: a.name for a in self._allocations}
-        self.model.set_rows(build_rows(page.items, category_names, allocation_names, sides))
+        try:
+            receipts = self._services.receipts.counts([t.id for t in page.items])
+        except MoneyManagerError as exc:  # the list still shows without the paperclips
+            logger.warning("Could not count receipts: %s", exc)
+            receipts = {}
+        self.model.set_rows(build_rows(page.items, category_names, allocation_names, sides,
+                                       receipts))
 
         self.balance_card.set_value(
             format_money(total_balance), "outflow" if total_balance.is_negative() else "neutral"
@@ -419,13 +442,13 @@ class TransactionsPage(BasePage):
     def _update_period_labels(self) -> None:
         filters = self._query.filters
         if filters.start is None and filters.end is None:
-            suffix = "all time"
+            suffix = tr("all time")
         elif filters.start is not None and filters.end is not None:
             suffix = f"{format_date(filters.start)} – {format_date(filters.end)}"
         else:
-            suffix = "selected period"
-        self.income_card.label.setText(f"Income · {suffix}")
-        self.expenses_card.label.setText(f"Expenses · {suffix}")
+            suffix = tr("selected period")
+        self.income_card.label.setText(tr("Income · {0}", suffix))
+        self.expenses_card.label.setText(tr("Expenses · {0}", suffix))
 
     def _update_empty_state(self, page: TransactionPage) -> None:
         # Without an account there is nothing to summarise, filter or page through.
@@ -434,22 +457,22 @@ class TransactionsPage(BasePage):
             widget.setVisible(self._has_accounts)
         if not self._has_accounts:
             self.empty_state.set_content(
-                "Create an account to get started",
-                "Transactions are recorded against an account, such as your bank account "
-                "or cash. Enter its current balance and start tracking from today.",
-                "Create account",
+                tr("Create an account to get started"),
+                tr("Transactions are recorded against an account, such as your bank account "
+                "or cash. Enter its current balance and start tracking from today."),
+                tr("Create account"),
             )
         elif page.total_count == 0 and not self.filter_bar.is_filtered():
             self.empty_state.set_content(
-                "No transactions yet",
-                "Record your first income or expense. Your balance updates automatically.",
-                "Add transaction",
+                tr("No transactions yet"),
+                tr("Record your first income or expense. Your balance updates automatically."),
+                tr("Add transaction"),
             )
         elif page.total_count == 0:
             self.empty_state.set_content(
-                "No matching transactions",
-                "Nothing matches the current search and filters.",
-                "Clear filters",
+                tr("No matching transactions"),
+                tr("Nothing matches the current search and filters."),
+                tr("Clear filters"),
             )
         else:
             self.stack.setCurrentWidget(self.table)
@@ -463,7 +486,7 @@ class TransactionsPage(BasePage):
     def _update_paging(self, page: TransactionPage) -> None:
         if page.total_count:
             self.result_label.setText(
-                f"Showing {page.first_index}–{page.last_index} of {page.total_count}"
+                tr("Showing {0}–{1} of {2}", page.first_index, page.last_index, page.total_count)
             )
         else:
             self.result_label.setText("")
@@ -477,6 +500,7 @@ class TransactionsPage(BasePage):
         has_selection = self.selected_transaction() is not None
         self.edit_button.setEnabled(has_selection)
         self.delete_button.setEnabled(has_selection)
+        self.receipts_button.setEnabled(has_selection)
 
     # ---------------------------------------------------------------- events
 

@@ -40,6 +40,7 @@ from money_manager.domain.money import Money
 from money_manager.ui.components.card import Card
 from money_manager.ui.formatting import format_compact_amount
 from money_manager.ui.theme import FONT_FAMILY, FONT_FILES, FONTS_DIR, Colors, Spacing
+from money_manager.core.i18n import tr
 
 # Categorical slots in their fixed order: a lime step of the design's accent,
 # then violet, orange, blue and yellow. Validated as a set on the dark ground
@@ -178,10 +179,10 @@ class ChartCard(Card):
         self.subtitle_label = QLabel(subtitle)
         self.subtitle_label.setObjectName("MutedLabel")
         self.subtitle_label.setWordWrap(True)
-        self.toggle_button = QPushButton("Table")
+        self.toggle_button = QPushButton(tr("Table"))
         self.toggle_button.setCheckable(True)
-        self.toggle_button.setToolTip("Show the values as a table")
-        self.toggle_button.setAccessibleName(f"Show {title} as a table")
+        self.toggle_button.setToolTip(tr("Show the values as a table"))
+        self.toggle_button.setAccessibleName(tr("Show {0} as a table", title))
         self.setAccessibleName(title)
         self.toggle_button.toggled.connect(self._on_toggled)
 
@@ -224,4 +225,4 @@ class ChartCard(Card):
 
     def _on_toggled(self, show_table: bool) -> None:
         self.stack.setCurrentIndex(1 if show_table else 0)
-        self.toggle_button.setText("Chart" if show_table else "Table")
+        self.toggle_button.setText(tr("Chart") if show_table else tr("Table"))

@@ -28,8 +28,10 @@ from money_manager.ui.formatting import (
     format_money,
     format_month,
     format_percent,
+    format_signed_money,
     month_abbreviation,
 )
+from money_manager.core.i18n import tr
 
 CATEGORY_SLOTS = 6  # top 5 + Other
 DAILY_TABLE_MAX_POINTS = 31
@@ -40,7 +42,7 @@ class IncomeExpenseChart(ChartCanvas):
 
     def render(self, flows: Sequence[MonthlyFlow], *, last_is_partial: bool = True) -> None:
         if not any(f.income.is_positive() or f.expenses.is_positive() for f in flows):
-            self.show_message("No income or expenses recorded in the last months")
+            self.show_message(tr("No income or expenses recorded in the last months"))
             return
         self.reset()
         ax = self.axes
@@ -48,8 +50,8 @@ class IncomeExpenseChart(ChartCanvas):
         for index, flow in enumerate(flows):
             label = format_month(flow.month)
             for offset, value, color, kind in (
-                (-(width + gap) / 2, flow.income, INCOME_COLOR, "Income"),
-                ((width + gap) / 2, flow.expenses, EXPENSE_COLOR, "Expenses"),
+                (-(width + gap) / 2, flow.income, INCOME_COLOR, tr("Income")),
+                ((width + gap) / 2, flow.expenses, EXPENSE_COLOR, tr("Expenses")),
             ):
                 [bar] = ax.bar(index + offset, plot_value(value), width=width, color=color,
                                label=kind if index == 0 else None)
@@ -57,7 +59,7 @@ class IncomeExpenseChart(ChartCanvas):
         ax.set_xticks(range(len(flows)))
         ax.set_xticklabels(
             [month_abbreviation(f.month)
-             + ("\n(to date)" if last_is_partial and i == len(flows) - 1 else "")
+             + (tr("\n(to date)") if last_is_partial and i == len(flows) - 1 else "")
              for i, f in enumerate(flows)]
         )
         tallest = max(max(plot_value(f.income), plot_value(f.expenses)) for f in flows)
@@ -80,7 +82,7 @@ class BalanceHistoryChart(ChartCanvas):
     def render(self, points: Sequence[BalancePoint]) -> None:
         self._points, self._xs = [], []
         if len(points) < 2:
-            self.show_message("The balance history appears after your first days of tracking")
+            self.show_message(tr("The balance history appears after your first days of tracking"))
             return
         self.reset()
         ax = self.axes
@@ -132,20 +134,21 @@ class NetWorthChart(ChartCanvas):
     def render(self, points: Sequence[NetWorthPoint]) -> None:
         self._points = []
         if len(points) < 2:
-            self.show_message("Your net worth over time appears after your first month")
+            self.show_message(tr("Your net worth over time appears after your first month"))
             return
         self.reset()
         ax = self.axes
         xs = list(range(len(points)))
         worth = [plot_value(p.net_worth) for p in points]
-        has_investments = any(not p.investments.is_zero() for p in points)
+        band = band_label(points)
+        has_investments = band is not None
         if has_investments:
             balance = [plot_value(p.balance) for p in points]
             ax.fill_between(xs, balance, worth, color=INVESTMENTS_COLOR, alpha=0.28, linewidth=0,
-                            label="Investments")
-            ax.plot(xs, balance, color=INVESTMENTS_COLOR, linewidth=1.5, label="Balance")
+                            label=band)
+            ax.plot(xs, balance, color=INVESTMENTS_COLOR, linewidth=1.5, label=tr("Balance"))
         ax.plot(xs, worth, color=BALANCE_COLOR, linewidth=2, marker="o", markersize=4,
-                solid_joinstyle="round", solid_capstyle="round", label="Net worth")
+                solid_joinstyle="round", solid_capstyle="round", label=tr("Net worth"))
         if min(worth) < 0 < max(worth):
             ax.axhline(0, color=AXIS_COLOR, linewidth=1)
         ax.plot([xs[-1]], [worth[-1]], marker="o", markersize=8, color=BALANCE_COLOR,
@@ -171,11 +174,18 @@ class NetWorthChart(ChartCanvas):
                                                 len(self._points) - 1)])
 
 
+def band_label(points: Sequence[NetWorthPoint]) -> str | None:
+    """What lies between the balance line and the net worth line (None: nothing)."""
+    investments = any(not p.investments.is_zero() for p in points)
+    loans = any(not p.loans.is_zero() for p in points)
+    if investments and loans:
+        return tr("Investments and loans")
+    return tr("Investments") if investments else tr("Loans") if loans else None
+
+
 def net_worth_text(point: NetWorthPoint) -> str:
-    return (f"{format_month(point.month)} · {format_date(point.on)}\n"
-            f"Net worth: {format_money(point.net_worth)}\n"
-            f"Balance: {format_money(point.balance)}\n"
-            f"Investments: {format_money(point.investments)}")
+    return (tr("{0} · {1}\nNet worth: {2}\nBalance: {3}\nInvestments: {4}", format_month(point.month), format_date(point.on), format_money(point.net_worth), format_money(point.balance), format_money(point.investments))
+            + ("" if point.loans.is_zero() else tr("\nLoans: {0}", format_signed_money(point.loans))))
 
 
 class CategorySpendingChart(ChartCanvas):
@@ -183,7 +193,7 @@ class CategorySpendingChart(ChartCanvas):
 
     def render(self, rows: Sequence[CategorySpending]) -> None:
         if not rows:
-            self.show_message("No expenses recorded this month")
+            self.show_message(tr("No expenses recorded this month"))
             return
         self.reset()
         ax = self.axes
@@ -214,7 +224,7 @@ class CategorySpendingChart(ChartCanvas):
 
 def income_expense_table(flows: Sequence[MonthlyFlow]) -> TableData:
     return (
-        ["Month", "Income", "Expenses", "Net"],
+        [tr("Month"), tr("Income"), tr("Expenses"), tr("Net")],
         [[format_month(f.month), format_money(f.income), format_money(f.expenses),
           format_money(f.net)] for f in flows],
     )
@@ -223,26 +233,26 @@ def income_expense_table(flows: Sequence[MonthlyFlow]) -> TableData:
 def balance_history_table(points: Sequence[BalancePoint]) -> TableData:
     """Every day for short ranges; month ends (and the last day) for longer ones."""
     if len(points) <= DAILY_TABLE_MAX_POINTS:
-        return ["Date", "Balance"], [[format_date(p.day), format_money(p.balance)] for p in points]
+        return [tr("Date"), tr("Balance")], [[format_date(p.day), format_money(p.balance)] for p in points]
     rows = [
         [format_date(p.day), format_money(p.balance)]
         for index, p in enumerate(points)
         if index == len(points) - 1 or points[index + 1].day.month != p.day.month
     ]
-    return ["Date", "Balance"], rows
+    return [tr("Date"), tr("Balance")], rows
 
 
 def net_worth_table(points: Sequence[NetWorthPoint]) -> TableData:
     return (
-        ["Month", "Balance", "Investments", "Net worth"],
+        [tr("Month"), tr("Balance"), tr("Investments"), tr("Loans"), tr("Net worth")],
         [[format_month(p.month), format_money(p.balance), format_money(p.investments),
-          format_money(p.net_worth)] for p in points],
+          format_signed_money(p.loans), format_money(p.net_worth)] for p in points],
     )
 
 
 def category_spending_table(rows: Sequence[CategorySpending]) -> TableData:
     return (
-        ["Category", "Spent", "Share"],
+        [tr("Category"), tr("Spent"), tr("Share")],
         [[r.name, format_money(r.amount), "—" if r.share is None else format_percent(r.share)]
          for r in rows],
     )

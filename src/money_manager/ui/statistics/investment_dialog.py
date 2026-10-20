@@ -15,20 +15,21 @@ from money_manager.core.errors import MoneyManagerError
 from money_manager.domain.enums import CategoryKind
 from money_manager.services import AppServices
 from money_manager.ui.theme import Spacing
+from money_manager.core.i18n import tr
 
 
 class InvestmentCategoriesDialog(QDialog):
     def __init__(self, services: AppServices, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._services = services
-        self.setWindowTitle("Investment categories")
+        self.setWindowTitle(tr("Investment categories"))
         self.setModal(True)
         self.setMinimumWidth(420)
 
         intro = QLabel(
-            "Tick the expense categories where money goes into investments (stocks, "
+            tr("Tick the expense categories where money goes into investments (stocks, "
             "retirement funds, …). They count towards your investment rate and as "
-            "saving rather than spending."
+            "saving rather than spending.")
         )
         intro.setObjectName("CardBody")
         intro.setWordWrap(True)
@@ -47,7 +48,7 @@ class InvestmentCategoriesDialog(QDialog):
             self.list.addItem(item)
             self._original[category.id] = category.is_investment
 
-        self.empty_label = QLabel("No expense categories yet.")
+        self.empty_label = QLabel(tr("No expense categories yet."))
         self.empty_label.setObjectName("MutedLabel")
         self.empty_label.setVisible(not categories)
 

@@ -10,6 +10,7 @@ from money_manager.domain.enums import CategoryKind, TransactionType, parse_tran
 from money_manager.domain.money import Money, parse_amount, validate_currency
 from money_manager.domain.investments import InvestmentKind
 from money_manager.domain.subscriptions import Frequency
+from money_manager.core.i18n import tr
 
 EARLIEST_ALLOWED_DATE = date(1900, 1, 1)
 MAX_ACCOUNT_NAME_LENGTH = 60
@@ -28,12 +29,12 @@ RESERVED_ALLOCATION_NAMES = frozenset({"available", "unallocated"})
 def clean_name(value: object, *, field: str, max_length: int) -> str:
     """Trim and collapse internal whitespace; reject empty or overlong names."""
     if not isinstance(value, str):
-        raise ValidationError("Name must be text.", field)
+        raise ValidationError(tr("Name must be text."), field)
     name = " ".join(value.split())
     if not name:
-        raise ValidationError("Name cannot be empty.", field)
+        raise ValidationError(tr("Name cannot be empty."), field)
     if len(name) > max_length:
-        raise ValidationError(f"Name cannot be longer than {max_length} characters.", field)
+        raise ValidationError(tr("Name cannot be longer than {0} characters.", max_length), field)
     return name
 
 
@@ -46,10 +47,10 @@ def clean_text(value: object, *, field: str, max_length: int) -> str:
     if value is None:
         return ""
     if not isinstance(value, str):
-        raise ValidationError("Must be text.", field)
+        raise ValidationError(tr("Must be text."), field)
     text = value.strip()
     if len(text) > max_length:
-        raise ValidationError(f"Cannot be longer than {max_length} characters.", field)
+        raise ValidationError(tr("Cannot be longer than {0} characters.", max_length), field)
     return text
 
 
@@ -57,13 +58,13 @@ def validate_date(value: object, *, field: str, today: date) -> date:
     """Accept a calendar date between 1900-01-01 and today."""
     # datetime is a subclass of date; a time component is not meaningful here.
     if isinstance(value, datetime) or not isinstance(value, date):
-        raise ValidationError("Enter a valid calendar date.", field)
+        raise ValidationError(tr("Enter a valid calendar date."), field)
     if value < EARLIEST_ALLOWED_DATE:
         raise ValidationError(
-            f"Date cannot be before {EARLIEST_ALLOWED_DATE.isoformat()}.", field
+            tr("Date cannot be before {0}.", EARLIEST_ALLOWED_DATE.isoformat()), field
         )
     if value > today:
-        raise ValidationError("Date cannot be in the future.", field)
+        raise ValidationError(tr("Date cannot be in the future."), field)
     return value
 
 
@@ -80,7 +81,7 @@ def is_record_id(value: object) -> bool:
 
 def validate_id(value: object, field: str) -> int:
     if not is_record_id(value):
-        raise ValidationError("Invalid reference.", field)
+        raise ValidationError(tr("Invalid reference."), field)
     assert isinstance(value, int)
     return value
 
@@ -88,7 +89,7 @@ def validate_id(value: object, field: str) -> int:
 def positive_amount(value: object, field: str = "amount", hint: str = "") -> Decimal:
     amount = parse_amount(value, field)
     if amount <= 0:
-        raise ValidationError(f"Amount must be greater than zero{hint}.", field)
+        raise ValidationError(tr("Amount must be greater than zero{0}.", hint), field)
     return amount
 
 
@@ -149,7 +150,7 @@ def validate_transaction(
     transaction_type = parse_transaction_type(draft.type)
     amount = Money(
         positive_amount(
-            draft.amount, hint=" (the transaction type decides whether money comes in or goes out)"
+            draft.amount, hint=tr(" (the transaction type decides whether money comes in or goes out)")
         ),
         account.currency,
     )
@@ -157,28 +158,26 @@ def validate_transaction(
     occurred_on = validate_date(draft.occurred_on, field="occurred_on", today=today)
     if occurred_on < account.opening_date:
         raise ValidationError(
-            f"Date cannot be before the account's opening date "
-            f"({account.opening_date.isoformat()}); the opening balance already "
-            "includes earlier activity.",
+            tr("Date cannot be before the account's opening date ({0}); the opening "
+               "balance already includes earlier activity.", account.opening_date.isoformat()),
             "occurred_on",
         )
 
     expected_kind = transaction_type.category_kind
     if expected_kind is None:
         if draft.category_id is not None:
-            raise ValidationError("Balance adjustments do not use a category.", "category_id")
+            raise ValidationError(tr("Balance adjustments do not use a category."), "category_id")
         category_id = None
     else:
         if category is None:
-            raise ValidationError("Choose a category.", "category_id")
+            raise ValidationError(tr("Choose a category."), "category_id")
         if category.kind is not expected_kind:
             raise ValidationError(
-                f"'{category.name}' is an {category.kind.value} category and cannot be used "
-                f"for an {transaction_type.label} transaction.",
+                tr("'{0}' is an {1} category and cannot be used for an {2} transaction.", category.name, tr(category.kind.value), transaction_type.label),
                 "category_id",
             )
         if category.is_archived and category.id != keep_archived_category_id:
-            raise ValidationError(f"The category '{category.name}' is archived.", "category_id")
+            raise ValidationError(tr("The category '{0}' is archived.", category.name), "category_id")
         category_id = category.id
 
     if draft.allocation_id is None:
@@ -186,15 +185,15 @@ def validate_transaction(
     else:
         if transaction_type.is_adjustment:
             raise ValidationError(
-                "Balance adjustments always affect Available money and cannot use an "
-                "allocation.",
+                tr("Balance adjustments always affect Available money and cannot use an "
+                "allocation."),
                 "allocation_id",
             )
         if allocation is None:
-            raise ValidationError("The selected allocation does not exist.", "allocation_id")
+            raise ValidationError(tr("The selected allocation does not exist."), "allocation_id")
         if allocation.is_archived and allocation.id != keep_archived_allocation_id:
             raise ValidationError(
-                f"The allocation '{allocation.name}' is archived.", "allocation_id"
+                tr("The allocation '{0}' is archived.", allocation.name), "allocation_id"
             )
         allocation_id = allocation.id
 
@@ -251,30 +250,30 @@ def validate_subscription(
         except ValueError:
             allowed = ", ".join(f.value for f in Frequency)
             raise ValidationError(
-                f"Invalid frequency {frequency!r}; expected one of: {allowed}.", "frequency"
+                tr("Invalid frequency {0!r}; expected one of: {1}.", frequency, allowed), "frequency"
             ) from None
 
     if isinstance(next_payment_date, datetime) or not isinstance(next_payment_date, date):
-        raise ValidationError("Enter a valid calendar date.", "next_payment_date")
+        raise ValidationError(tr("Enter a valid calendar date."), "next_payment_date")
     if (today - next_payment_date).days > SUBSCRIPTION_PAST_LIMIT_DAYS:
         raise ValidationError(
-            "The next payment date cannot be more than a year in the past.", "next_payment_date"
+            tr("The next payment date cannot be more than a year in the past."), "next_payment_date"
         )
     if next_payment_date.year > today.year + SUBSCRIPTION_FUTURE_LIMIT_YEARS:
         raise ValidationError(
-            f"The next payment date must be within {SUBSCRIPTION_FUTURE_LIMIT_YEARS} years.",
+            tr("The next payment date must be within {0} years.", SUBSCRIPTION_FUTURE_LIMIT_YEARS),
             "next_payment_date",
         )
 
     if category is None:
-        raise ValidationError("Choose a category.", "category_id")
+        raise ValidationError(tr("Choose a category."), "category_id")
     if category.kind is not CategoryKind.EXPENSE:
         raise ValidationError(
-            f"'{category.name}' is an income category; subscriptions need an expense category.",
+            tr("'{0}' is an income category; subscriptions need an expense category.", category.name),
             "category_id",
         )
     if category.is_archived and category.id != keep_archived_category_id:
-        raise ValidationError(f"The category '{category.name}' is archived.", "category_id")
+        raise ValidationError(tr("The category '{0}' is archived.", category.name), "category_id")
 
     return ValidSubscription(
         name=clean_name(name, field="name", max_length=MAX_SUBSCRIPTION_NAME_LENGTH),
@@ -303,7 +302,7 @@ def validate_investment(*, name: object, kind: object, notes: object) -> ValidIn
         except ValueError:
             allowed = ", ".join(k.value for k in InvestmentKind)
             raise ValidationError(
-                f"Invalid investment type {kind!r}; expected one of: {allowed}.", "kind"
+                tr("Invalid investment type {0!r}; expected one of: {1}.", kind, allowed), "kind"
             ) from None
     return ValidInvestment(
         name=clean_name(name, field="name", max_length=MAX_INVESTMENT_NAME_LENGTH),
@@ -337,12 +336,12 @@ def validate_goal(
     clean_deadline: date | None = None
     if deadline is not None:
         if isinstance(deadline, datetime) or not isinstance(deadline, date):
-            raise ValidationError("Enter a valid calendar date.", "deadline")
+            raise ValidationError(tr("Enter a valid calendar date."), "deadline")
         if deadline < today and deadline != current_deadline:
-            raise ValidationError("The deadline cannot be in the past.", "deadline")
+            raise ValidationError(tr("The deadline cannot be in the past."), "deadline")
         if deadline.year > today.year + MAX_DEADLINE_YEARS:
             raise ValidationError(
-                f"The deadline must be within {MAX_DEADLINE_YEARS} years.", "deadline"
+                tr("The deadline must be within {0} years.", MAX_DEADLINE_YEARS), "deadline"
             )
         clean_deadline = deadline
     return ValidGoal(
@@ -358,7 +357,7 @@ def validate_goal(
 def non_negative_amount(value: object, field: str = "amount") -> Decimal:
     amount = parse_amount(value, field)
     if amount < 0:
-        raise ValidationError("The amount cannot be negative.", field)
+        raise ValidationError(tr("The amount cannot be negative."), field)
     return amount
 
 
@@ -366,7 +365,7 @@ def validate_allocation_name(value: object) -> str:
     name = clean_name(value, field="name", max_length=MAX_ALLOCATION_NAME_LENGTH)
     if normalize_name(name) in RESERVED_ALLOCATION_NAMES:
         raise ValidationError(
-            f"'{name}' is reserved for money that is not allocated.", "name"
+            tr("'{0}' is reserved for money that is not allocated.", name), "name"
         )
     return name
 
@@ -396,16 +395,16 @@ def validate_transfer(
     """
     if source is None and destination is None:
         raise ValidationError(
-            "Choose an allocation; moving money from Available to Available does nothing.",
+            tr("Choose an allocation; moving money from Available to Available does nothing."),
             "to_allocation_id",
         )
     if source is not None and destination is not None and source.id == destination.id:
         raise ValidationError(
-            "The source and destination must be different.", "to_allocation_id"
+            tr("The source and destination must be different."), "to_allocation_id"
         )
     for allocation, field in ((source, "from_allocation_id"), (destination, "to_allocation_id")):
         if allocation is not None and allocation.is_archived:
-            raise ValidationError(f"The allocation '{allocation.name}' is archived.", field)
+            raise ValidationError(tr("The allocation '{0}' is archived.", allocation.name), field)
 
     return ValidTransfer(
         from_allocation_id=None if source is None else source.id,

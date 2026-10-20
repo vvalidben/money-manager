@@ -9,10 +9,11 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QWidget
 
 from money_manager.core.errors import MoneyManagerError
+from money_manager.core.i18n import tr
 
 UNEXPECTED_ERROR_MESSAGE = (
-    "An unexpected error occurred. Your data has not been sent anywhere; "
-    "technical details were written to the log file."
+    tr("An unexpected error occurred. Your data has not been sent anywhere; "
+    "technical details were written to the log file.")
 )
 
 
@@ -79,4 +80,4 @@ def show_unexpected_error(exc: BaseException) -> None:
     if QApplication.instance() is None:
         return
     message = str(exc) if isinstance(exc, MoneyManagerError) else UNEXPECTED_ERROR_MESSAGE
-    show_error(QApplication.activeWindow(), "Something went wrong", message)
+    show_error(QApplication.activeWindow(), tr("Something went wrong"), message)

@@ -20,14 +20,15 @@ from money_manager.ui.formatting import (
     format_percent,
     format_signed_money,
 )
+from money_manager.core.i18n import tr
 
 Tone = Literal["neutral", "inflow", "outflow"]
 
 LEVEL_TEXT = {
-    HealthLevel.GOOD: "✓ Good",
-    HealthLevel.FAIR: "● Fair",
-    HealthLevel.POOR: "! Needs attention",
-    HealthLevel.UNKNOWN: "– Not enough data",
+    HealthLevel.GOOD: tr("✓ Good"),
+    HealthLevel.FAIR: tr("● Fair"),
+    HealthLevel.POOR: tr("! Needs attention"),
+    HealthLevel.UNKNOWN: tr("– Not enough data"),
 }
 
 
@@ -71,7 +72,7 @@ def build_dashboard_view(overview: DashboardOverview) -> DashboardView:
     period = overview.period
     period_text = format_day_range(period.start, period.end)
     return DashboardView(
-        subtitle=f"{format_month(period.end)} · month to date ({period_text})",
+        subtitle=tr("{0} · month to date ({1})", format_month(period.end), period_text),
         stats=_stats(overview, period_text),
         allocation_rows=_allocation_rows(overview),
         allocation_note=_allocation_note(overview),
@@ -83,27 +84,26 @@ def _stats(overview: DashboardOverview, period_text: str) -> tuple[StatView, ...
     health = overview.health
     net = overview.savings
     if overview.income.is_positive() and health.savings_rate is not None:
-        net_caption = f"{format_percent(health.savings_rate)} of income"
+        net_caption = tr("{0} of income", format_percent(health.savings_rate))
     else:
-        net_caption = "No income recorded yet this month"
+        net_caption = tr("No income recorded yet this month")
     previous = overview.previous_period
     return (
         _balance_stat(overview),
         StatView(
-            "Income this month",
+            tr("Income this month"),
             format_signed_money(overview.income),
             period_text,
             "inflow",
         ),
         StatView(
-            "Expenses this month",
+            tr("Expenses this month"),
             format_signed_money(-overview.expenses),
-            f"vs {format_money(overview.previous_period_expenses)} in "
-            f"{format_day_range(previous.start, previous.end)}",
+            tr("vs {0} in {1}", format_money(overview.previous_period_expenses), format_day_range(previous.start, previous.end)),
             "outflow",
         ),
         StatView(
-            "Saved this month" if not net.is_negative() else "Overspent this month",
+            tr("Saved this month") if not net.is_negative() else tr("Overspent this month"),
             format_signed_money(net),
             net_caption,
             "outflow" if net.is_negative() else "inflow",
@@ -119,11 +119,11 @@ def _balance_stat(overview: DashboardOverview) -> StatView:
         goal_allocations = {g.goal.allocation_id for g in overview.goals}
         only_goals = all(row.allocation.id in goal_allocations
                          for row in summary.allocations if row.balance.is_positive())
-        where = "in goals" if only_goals else "set aside"
-        caption = f"{format_money(overview.total_balance)} total − {format_money(set_aside)} {where}"
+        where = tr("in goals") if only_goals else tr("set aside")
+        caption = tr("{0} total − {1} {2}", format_money(overview.total_balance), format_money(set_aside), where)
     else:
-        caption = f"Nothing set aside · as of {format_date(overview.period.end)}"
-    return StatView("Available balance", format_money(available), caption,
+        caption = tr("Nothing set aside · as of {0}", format_date(overview.period.end))
+    return StatView(tr("Available balance"), format_money(available), caption,
                     "outflow" if available.is_negative() else "neutral")
 
 
@@ -148,11 +148,11 @@ def _allocation_note(overview: DashboardOverview) -> str | None:
     summary = overview.allocation
     if summary.is_over_allocated:
         return (
-            f"Over-allocated by {format_money(summary.shortfall)}: allocations exceed your "
-            "real balance. Move money from an allocation back to Available."
+            tr("Over-allocated by {0}: allocations exceed your real balance. Move money "
+               "from an allocation back to Available.", format_money(summary.shortfall))
         )
     if not summary.allocations:
-        return "No allocations yet — all of your money is Available."
+        return tr("No allocations yet — all of your money is Available.")
     return None
 
 
@@ -161,14 +161,14 @@ def _health_rows(overview: DashboardOverview) -> tuple[HealthRowView, ...]:
     previous, period = overview.previous_period, overview.period
     return (
         HealthRowView(
-            "Savings rate",
+            tr("Savings rate"),
             "—" if health.savings_rate is None else format_percent(health.savings_rate),
-            "Share of this month's income you kept",
+            tr("Share of this month's income you kept"),
             health.savings_level,
             LEVEL_TEXT[health.savings_level],
         ),
         HealthRowView(
-            "Spending vs last month",
+            tr("Spending vs last month"),
             "—"
             if health.spending_change is None
             else format_percent(health.spending_change, signed=True),
@@ -178,16 +178,16 @@ def _health_rows(overview: DashboardOverview) -> tuple[HealthRowView, ...]:
             LEVEL_TEXT[health.spending_level],
         ),
         HealthRowView(
-            "Emergency runway",
+            tr("Emergency runway"),
             "—" if health.runway_months is None else f"{health.runway_months} months",
-            "Balance ÷ average monthly spending (last 3 full months)",
+            tr("Balance ÷ average monthly spending (last 3 full months)"),
             health.runway_level,
             LEVEL_TEXT[health.runway_level],
         ),
         HealthRowView(
-            "Allocated",
+            tr("Allocated"),
             "—" if health.allocated_share is None else format_percent(health.allocated_share),
-            "Share of your balance set aside in allocations",
+            tr("Share of your balance set aside in allocations"),
             None,
             "",
         ),
@@ -219,9 +219,9 @@ def renewal_views(payments: Sequence[UpcomingPayment], limit: int = 4) -> tuple[
 
 def _when(days: int) -> str:
     if days < 0:
-        return f"Overdue by {-days} day{'' if days == -1 else 's'}"
+        return tr("Overdue by {0} day{1}", -days, '' if days == -1 else 's')
     if days == 0:
-        return "Today"
+        return tr("Today")
     if days == 1:
-        return "Tomorrow"
-    return f"In {days} days"
+        return tr("Tomorrow")
+    return tr("In {0} days", days)

@@ -29,6 +29,7 @@ from money_manager.ui.formatting import format_money
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import to_qdate
 from money_manager.ui.transactions.transaction_dialog import AMOUNT_INPUT_PATTERN
+from money_manager.core.i18n import tr
 
 TRACK_NEW_ALLOCATION = "new_allocation"
 TRACK_EXISTING_ALLOCATION = "existing_allocation"
@@ -56,15 +57,15 @@ class GoalDialog(QDialog):
         self.saved: GoalProgress | None = None
         today = services.today()
 
-        self.setWindowTitle("Edit goal" if goal else "New goal")
+        self.setWindowTitle(tr("Edit goal") if goal else tr("New goal"))
         self.setModal(True)
         self.setMinimumWidth(480)
 
         self.name_edit = QLineEdit()
         self.name_edit.setMaxLength(MAX_GOAL_NAME_LENGTH)
-        self.name_edit.setPlaceholderText("e.g. Emergency Fund")
+        self.name_edit.setPlaceholderText(tr("e.g. Emergency Fund"))
         self.target_edit = amount_edit()
-        self.deadline_check = QCheckBox("Set a deadline")
+        self.deadline_check = QCheckBox(tr("Set a deadline"))
         self.deadline_edit = QDateEdit(to_qdate(today + timedelta(days=365)))
         self.deadline_edit.setCalendarPopup(True)
         self.deadline_edit.setDisplayFormat("dd/MM/yyyy")
@@ -78,14 +79,14 @@ class GoalDialog(QDialog):
         deadline_layout.addWidget(self.deadline_edit)
         self.description_edit = QPlainTextEdit()
         self.description_edit.setFixedHeight(60)
-        self.description_edit.setPlaceholderText("Optional")
+        self.description_edit.setPlaceholderText(tr("Optional"))
 
         # Keys match the ``field`` names of the service's ValidationError.
         self.fields: dict[str, FormField] = {
-            "name": FormField("Name", self.name_edit),
-            "target": FormField(f"Target ({services.base_currency})", self.target_edit),
-            "deadline": FormField("Deadline", deadline_box, highlight=self.deadline_edit),
-            "description": FormField("Description", self.description_edit),
+            "name": FormField(tr("Name"), self.name_edit),
+            "target": FormField(tr("Target ({0})", services.base_currency), self.target_edit),
+            "deadline": FormField(tr("Deadline"), deadline_box, highlight=self.deadline_edit),
+            "description": FormField(tr("Description"), self.description_edit),
         }
 
         self.form_error = QLabel()
@@ -104,9 +105,9 @@ class GoalDialog(QDialog):
             self._build_tracking(layout)
         else:
             tracking = QLabel(
-                "Tracked manually — not part of your balance."
+                tr("Tracked manually — not part of your balance.")
                 if goal.goal.is_manual
-                else f"Money kept in the allocation “{goal.allocation_name}”."
+                else tr("Money kept in the allocation “{0}”.", goal.allocation_name)
             )
             tracking.setObjectName("MutedLabel")
             layout.addWidget(tracking)
@@ -116,7 +117,7 @@ class GoalDialog(QDialog):
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
         save = buttons.button(QDialogButtonBox.StandardButton.Save)
-        save.setText("Save changes" if goal else "Create goal")
+        save.setText(tr("Save changes") if goal else tr("Create goal"))
         save.setObjectName("PrimaryButton")
         buttons.accepted.connect(self.submit)
         buttons.rejected.connect(self.reject)
@@ -125,22 +126,22 @@ class GoalDialog(QDialog):
     # ----------------------------------------------------------- tracking
 
     def _build_tracking(self, layout: QVBoxLayout) -> None:
-        heading = QLabel("Where is the money kept?")
+        heading = QLabel(tr("Where is the money kept?"))
         heading.setObjectName("FieldLabel")
         layout.addWidget(heading)
 
         self.tracking_group = QButtonGroup(self)
-        self.new_radio = QRadioButton("In a new allocation for this goal (recommended)")
-        self.existing_radio = QRadioButton("In an allocation I already have")
-        self.manual_radio = QRadioButton("I'll track it manually (money outside the app)")
+        self.new_radio = QRadioButton(tr("In a new allocation for this goal (recommended)"))
+        self.existing_radio = QRadioButton(tr("In an allocation I already have"))
+        self.manual_radio = QRadioButton(tr("I'll track it manually (money outside the app)"))
         for radio in (self.new_radio, self.existing_radio, self.manual_radio):
             self.tracking_group.addButton(radio)
         self.new_radio.setChecked(True)
 
         available = self._services.allocations.available()
-        self.initial_edit = amount_edit("0.00 (optional)")
+        self.initial_edit = amount_edit(tr("0.00 (optional)"))
         self.fields["initial_amount"] = FormField(
-            f"Move from Available now · {format_money(available)} available", self.initial_edit
+            tr("Move from Available now · {0} available", format_money(available)), self.initial_edit
         )
 
         self.allocation_combo = QComboBox()
@@ -148,17 +149,17 @@ class GoalDialog(QDialog):
         for allocation in self._services.allocations.list():
             if allocation.id not in used:
                 self.allocation_combo.addItem(allocation.name, allocation.id)
-        self.allocation_combo.setPlaceholderText("No free allocations")
+        self.allocation_combo.setPlaceholderText(tr("No free allocations"))
         self.existing_radio.setEnabled(self.allocation_combo.count() > 0)
-        self.fields["allocation_id"] = FormField("Allocation", self.allocation_combo)
+        self.fields["allocation_id"] = FormField(tr("Allocation"), self.allocation_combo)
 
         self.current_edit = amount_edit()
-        self.fields["current"] = FormField("Saved so far", self.current_edit)
+        self.fields["current"] = FormField(tr("Saved so far"), self.current_edit)
 
         for widget in (self.new_radio, self.fields["initial_amount"], self.existing_radio,
                        self.fields["allocation_id"], self.manual_radio, self.fields["current"]):
             layout.addWidget(widget)
-        note = QLabel("Moving money into an allocation never changes your total balance.")
+        note = QLabel(tr("Moving money into an allocation never changes your total balance."))
         note.setObjectName("MutedLabel")
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -218,7 +219,7 @@ class GoalDialog(QDialog):
             elif self.tracking == TRACK_EXISTING_ALLOCATION:
                 allocation_id = self.allocation_combo.currentData()
                 if allocation_id is None:
-                    raise ValidationError("Choose an allocation.", "allocation_id")
+                    raise ValidationError(tr("Choose an allocation."), "allocation_id")
                 self.saved = goals.create_with_allocation(name, allocation_id=allocation_id,
                                                           **common)
             elif self.tracking == TRACK_MANUAL:

@@ -12,6 +12,7 @@ from money_manager.core.config import AppConfig
 from money_manager.services import AppServices
 from money_manager.ui.ai.settings_card import AISettingsCard
 from money_manager.ui.lock.settings_card import AppLockCard
+from money_manager.ui.settings.updates_card import UpdatesCard
 from money_manager.ui.pages.base_page import BasePage
 from money_manager.ui.pages.registry import SETTINGS_PAGE_KEY, PageSpec
 from money_manager.ui.settings.cards import (
@@ -49,6 +50,7 @@ class SettingsPage(BasePage):
         self.reset_card = ResetCard(services)
         self.safety_card = SafetyCopiesCard(services, config)
         self.about_card = AboutCard(services, config)
+        self.updates_card = UpdatesCard(services)
         for card in (self.currency_card, self.data_card, self.reset_card,
                      self.safety_card):
             card.changed.connect(lambda: self.reload_requested.emit(SETTINGS_PAGE_KEY))
@@ -61,7 +63,7 @@ class SettingsPage(BasePage):
         for card in (self.storage_card, self.currency_card, self.appearance_card,
                      self.lock_card, self.ai_card,
                      self.rules_card, self.data_card, self.privacy_card, self.safety_card,
-                     self.reset_card,
+                     self.reset_card, self.updates_card,
                      self.about_card):
             content_layout.addWidget(card)
         content_layout.addStretch(1)
@@ -76,6 +78,7 @@ class SettingsPage(BasePage):
         self.currency_card.load()
         self.appearance_card.load()
         self.lock_card.load()
+        self.updates_card.load()
         self.safety_card.load()
         self.rules_card.load()
         self.ai_card.load()

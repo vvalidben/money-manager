@@ -26,6 +26,7 @@ from money_manager.ui.navigation import dot_pixmap
 from money_manager.ui.pages.base_page import BasePage
 from money_manager.ui.pages.registry import PageSpec
 from money_manager.ui.theme import Spacing, identity_color, set_style_property
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ class BudgetCard(Card):
         self.bar.setRange(0, BAR_STEPS)
         self.bar.setValue(int(view.bar_fraction * BAR_STEPS))  # drawing only
         set_style_property(self.bar, "level", view.bar_level)
-        self.bar.setAccessibleName(f"{view.name}: {view.percent} of the monthly limit")
+        self.bar.setAccessibleName(tr("{0}: {1} of the monthly limit", view.name, view.percent))
         self.body.addWidget(self.bar)
 
         for text in (view.left, view.projection):
@@ -89,9 +90,9 @@ class BudgetCard(Card):
 
         actions = QHBoxLayout()
         actions.addStretch(1)
-        edit = QPushButton("Edit")
+        edit = QPushButton(tr("Edit"))
         edit.clicked.connect(lambda: self.edit_requested.emit(view.category_id))
-        remove = QPushButton("Remove")
+        remove = QPushButton(tr("Remove"))
         remove.setObjectName("DangerButton")
         remove.clicked.connect(lambda: self.remove_requested.emit(view.category_id))
         actions.addWidget(edit)
@@ -107,21 +108,21 @@ class BudgetsPage(BasePage):
         self.summary: BudgetSummary | None = None
         self.cards: list[BudgetCard] = []
 
-        self.new_button = QPushButton("New budget")
+        self.new_button = QPushButton(tr("New budget"))
         self.new_button.setObjectName("PrimaryButton")
         self.new_button.clicked.connect(self.create_budget)
-        self.new_button.setToolTip("New budget (Ctrl+N)")
+        self.new_button.setToolTip(tr("New budget (Ctrl+N)"))
         self.header.add_action(self.new_button)
         self.primary_button = self.new_button
 
         self.stat_cards = tuple(StatCard("", compact=True) for _ in range(4))
         self.stats_row = ResponsiveRow(self.stat_cards, min_item_width=190)
         self.empty_state = EmptyState(
-            "No budgets yet",
-            "Set a monthly limit for a spending category, such as groceries or eating out, "
-            "and see at a glance how much is left this month.",
+            tr("No budgets yet"),
+            tr("Set a monthly limit for a spending category, such as groceries or eating out, "
+            "and see at a glance how much is left this month."),
             badge=None,
-            action_text="Create a budget",
+            action_text=tr("Create a budget"),
         )
         self.empty_state.action_clicked.connect(self.create_budget)
 
@@ -156,7 +157,7 @@ class BudgetsPage(BasePage):
             summary = self._services.budgets.overview()
         except MoneyManagerError as exc:
             logger.warning("Could not load budgets: %s", exc)
-            dialogs.show_warning(self, "Could not load budgets", str(exc))
+            dialogs.show_warning(self, tr("Could not load budgets"), str(exc))
             return
         self.summary = summary
         for card, stat in zip(self.stat_cards, summary_stats(summary), strict=True):
@@ -197,28 +198,28 @@ class BudgetsPage(BasePage):
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved is not None:
             self.refresh()
             card = self.card_for(dialog.saved.category_id)
-            self.notice.emit("Budget saved", f"{card.view.name} · {card.view.limit_amount} a month")
+            self.notice.emit(tr("Budget saved"), tr("{0} · {1} a month", card.view.name, card.view.limit_amount))
 
     def edit_budget(self, category_id: int) -> None:
         dialog = self.make_budget_dialog(category_id)
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved is not None:
             self.refresh()
             card = self.card_for(category_id)
-            self.notice.emit("Budget updated", f"{card.view.name} · {card.view.limit_amount} a month")
+            self.notice.emit(tr("Budget updated"), tr("{0} · {1} a month", card.view.name, card.view.limit_amount))
 
     def remove_budget(self, category_id: int) -> None:
         card = self.card_for(category_id)
-        message = (f"Remove the budget for {card.view.name}?\n\nYour spending and the category "
-                   "itself are not affected.")
-        if not dialogs.confirm_destructive(self, "Remove budget", message, "Remove"):
+        message = (tr("Remove the budget for {0}?\n\nYour spending and the category itself are "
+                      "not affected.", card.view.name))
+        if not dialogs.confirm_destructive(self, tr("Remove budget"), message, tr("Remove")):
             return
         try:
             self._services.budgets.remove(category_id)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not remove the budget", str(exc))
+            dialogs.show_warning(self, tr("Could not remove the budget"), str(exc))
             return
         self.refresh()
-        self.notice.emit("Budget removed", card.view.name)
+        self.notice.emit(tr("Budget removed"), card.view.name)
 
     # Separate so tests can substitute non-modal fakes.
     def make_budget_dialog(self, category_id: int | None) -> BudgetDialog:

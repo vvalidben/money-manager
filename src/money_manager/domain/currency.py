@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from money_manager.core.errors import ValidationError
 from money_manager.domain.money import DEFAULT_CURRENCY
+from money_manager.core.i18n import tr
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,7 +21,7 @@ class CurrencyInfo:
 
     @property
     def label(self) -> str:
-        return f"{self.code} – {self.name}"
+        return f"{self.code} – {tr(self.name)}"
 
 
 SUPPORTED_CURRENCIES: dict[str, CurrencyInfo] = {
@@ -44,5 +45,5 @@ assert all(info.decimals == 2 for info in SUPPORTED_CURRENCIES.values())
 def validate_currency(code: object) -> str:
     text = code.strip().upper() if isinstance(code, str) else ""
     if text not in SUPPORTED_CURRENCIES:
-        raise ValidationError("Choose one of the supported currencies.", "currency")
+        raise ValidationError(tr("Choose one of the supported currencies."), "currency")
     return text

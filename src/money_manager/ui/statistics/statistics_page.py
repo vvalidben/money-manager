@@ -59,6 +59,7 @@ from money_manager.ui.formatting import format_month
 from money_manager.ui.pages.base_page import BasePage
 from money_manager.ui.pages.registry import PageSpec
 from money_manager.ui.reports.monthly_pdf import write_monthly_report
+from money_manager.ui.reports.yearly_pdf import write_yearly_report
 from money_manager.ui.statistics.investment_dialog import InvestmentCategoriesDialog
 from money_manager.ui.statistics.range_bar import RangeBar
 from money_manager.ui.statistics.view_model import (
@@ -68,6 +69,7 @@ from money_manager.ui.statistics.view_model import (
     build_statistics_view,
 )
 from money_manager.ui.theme import SIDE_BY_SIDE_MIN_WIDTH, Spacing
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -85,12 +87,16 @@ class StatisticsPage(BasePage):
         # Filter row (scopes everything below)
         self.range_bar = RangeBar(services.today)
         self.range_bar.changed.connect(self.refresh)
-        self.investments_button = QPushButton("Investment categories…")
+        self.investments_button = QPushButton(tr("Investment categories…"))
         self.investments_button.clicked.connect(self.edit_investment_categories)
-        self.report_button = QPushButton("Monthly report…")
-        self.report_button.setToolTip("Save a month's summary as a PDF you can print or keep")
+        self.report_button = QPushButton(tr("Monthly report…"))
+        self.report_button.setToolTip(tr("Save a month's summary as a PDF you can print or keep"))
         self.report_button.clicked.connect(self.save_report)
         self.header.add_action(self.report_button)
+        self.yearly_button = QPushButton(tr("Yearly report\u2026"))
+        self.yearly_button.setToolTip(tr("Save a summary of a whole year as a PDF"))
+        self.yearly_button.clicked.connect(self.save_yearly_report)
+        self.header.add_action(self.yearly_button)
         self.range_error = QLabel()
         self.range_error.setObjectName("FieldError")
         self.range_error.hide()
@@ -102,7 +108,7 @@ class StatisticsPage(BasePage):
 
         self.period_label = QLabel()
         self.period_label.setObjectName("MutedLabel")
-        self.loading_label = QLabel("Updating…")
+        self.loading_label = QLabel(tr("Updating…"))
         self.loading_label.setObjectName("MutedLabel")
         self.loading_label.hide()
         period_row = QWidget()
@@ -114,25 +120,25 @@ class StatisticsPage(BasePage):
 
         # Cards
         self.stat_cards = tuple(StatCard("", compact=True) for _ in range(5))
-        self.balance_card = ChartCard("Balance trend", "", BalanceHistoryChart())
+        self.balance_card = ChartCard(tr("Balance trend"), "", BalanceHistoryChart())
         self.share_card = ChartCard(
-            "Spending by category", "Investments excluded · top 5, the rest as Other",
+            tr("Spending by category"), tr("Investments excluded · top 5, the rest as Other"),
             CategoryShareChart(),
         )
         self.flows_card = ChartCard(
-            "Income vs expenses", "Calendar months in the range", IncomeExpenseChart()
+            tr("Income vs expenses"), tr("Calendar months in the range"), IncomeExpenseChart()
         )
-        self.trend_card = ChartCard("Spending trend", "", SpendingTrendChart())
-        self.changes_card = ChartCard("Category changes", "", CategoryChangeChart(height_px=300))
+        self.trend_card = ChartCard(tr("Spending trend"), "", SpendingTrendChart())
+        self.changes_card = ChartCard(tr("Category changes"), "", CategoryChangeChart(height_px=300))
         self.months_card = DataTableCard(
-            "Monthly comparison",
-            "Spending change compares with the previous month (the current month with the "
-            "same days of last month).",
+            tr("Monthly comparison"),
+            tr("Spending change compares with the previous month (the current month with the "
+            "same days of last month)."),
         )
-        self.recurring_card = DataTableCard("Recurring spending")
+        self.recurring_card = DataTableCard(tr("Recurring spending"))
         self.facts_card = FactsCard(
-            "Key facts",
-            "Measured from your own data by fixed rules — no AI, no judgements.",
+            tr("Key facts"),
+            tr("Measured from your own data by fixed rules — no AI, no judgements."),
         )
 
         grid = QGridLayout()
@@ -151,11 +157,11 @@ class StatisticsPage(BasePage):
             grid.setColumnStretch(column, 1)
 
         self.empty_state = EmptyState(
-            "Create an account to get started",
-            "Statistics are calculated from your recorded transactions. Add the account "
-            "you want to track first.",
+            tr("Create an account to get started"),
+            tr("Statistics are calculated from your recorded transactions. Add the account "
+            "you want to track first."),
             badge=None,
-            action_text="Create account",
+            action_text=tr("Create account"),
         )
         self.empty_state.action_clicked.connect(self.create_account)
 
@@ -237,10 +243,10 @@ class StatisticsPage(BasePage):
             self._show_range_error(str(exc))
         elif isinstance(exc, MoneyManagerError):
             logger.warning("Could not compute statistics: %s", exc)
-            dialogs.show_warning(self, "Could not compute statistics", str(exc))
+            dialogs.show_warning(self, tr("Could not compute statistics"), str(exc))
         else:
             logger.error("Statistics failed unexpectedly", exc_info=exc)
-            dialogs.show_warning(self, "Could not compute statistics",
+            dialogs.show_warning(self, tr("Could not compute statistics"),
                                  dialogs.UNEXPECTED_ERROR_MESSAGE)
 
     def _show_range_error(self, message: str) -> None:
@@ -264,11 +270,11 @@ class StatisticsPage(BasePage):
         try:
             months = self._services.reports.months()
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not prepare the report", str(exc))
+            dialogs.show_warning(self, tr("Could not prepare the report"), str(exc))
             return None
         if not months:
-            dialogs.show_info(self, "Monthly report",
-                              "Create an account first; the report covers its months.")
+            dialogs.show_info(self, tr("Monthly report"),
+                              tr("Create an account first; the report covers its months."))
             return None
         month = self.ask_report_month(months)
         if month is None:
@@ -280,23 +286,58 @@ class StatisticsPage(BasePage):
             write_monthly_report(self._services.reports.monthly(month), path)
         except (MoneyManagerError, OSError) as exc:
             logger.warning("Could not save the monthly report: %s", exc)
-            dialogs.show_warning(self, "Could not save the report", str(exc))
+            dialogs.show_warning(self, tr("Could not save the report"), str(exc))
             return None
         logger.info("Monthly report saved")
-        self.notice.emit("Report saved", path.name)
+        self.notice.emit(tr("Report saved"), path.name)
         self.open_report(path)
         return path
 
+    def save_yearly_report(self) -> Path | None:
+        """Ask for a year and a file, write the PDF and open it."""
+        try:
+            years = self._services.reports.years()
+        except MoneyManagerError as exc:
+            dialogs.show_warning(self, tr("Could not prepare the report"), str(exc))
+            return None
+        if not years:
+            dialogs.show_info(self, tr("Yearly report"),
+                              tr("Create an account first; the report covers its years."))
+            return None
+        year = self.ask_report_year(years)
+        if year is None:
+            return None
+        path = self.ask_report_path(default_report_path(date(year, 1, 1), yearly=True))
+        if path is None:
+            return None
+        try:
+            write_yearly_report(self._services.reports.yearly(year), path)
+        except (MoneyManagerError, OSError) as exc:
+            logger.warning("Could not save the yearly report: %s", exc)
+            dialogs.show_warning(self, tr("Could not save the report"), str(exc))
+            return None
+        logger.info("Yearly report saved")
+        self.notice.emit(tr("Report saved"), path.name)
+        self.open_report(path)
+        return path
+
+    def ask_report_year(self, years: list[int]) -> int | None:
+        today = self._services.today()
+        labels = [tr("{0} (to date)", y) if y == today.year else str(y) for y in years]
+        default = 1 if len(years) > 1 and today.month < 3 else 0
+        label, ok = QInputDialog.getItem(self, tr("Yearly report"), tr("Year:"), labels, default, False)
+        return years[labels.index(label)] if ok else None
+
     def ask_report_month(self, months: list[date]) -> date | None:
         today = self._services.today()
-        labels = [format_month(m) + (" (to date)" if (m.year, m.month) == (today.year, today.month)
+        labels = [format_month(m) + (tr(" (to date)") if (m.year, m.month) == (today.year, today.month)
                                      else "") for m in months]
         default = 1 if len(months) > 1 else 0  # the last complete month
-        label, ok = QInputDialog.getItem(self, "Monthly report", "Month:", labels, default, False)
+        label, ok = QInputDialog.getItem(self, tr("Monthly report"), tr("Month:"), labels, default, False)
         return months[labels.index(label)] if ok else None
 
     def ask_report_path(self, suggested: Path) -> Path | None:
-        path = dialogs.ask_save_path(self, "Save the monthly report", suggested, "PDF (*.pdf)")
+        path = dialogs.ask_save_path(self, tr("Save the monthly report"), suggested, "PDF (*.pdf)")
         if path is not None and path.suffix.lower() != ".pdf":
             path = path.with_name(path.name + ".pdf")
         return path
@@ -341,7 +382,7 @@ class StatisticsPage(BasePage):
         self.trend_card.set_table(spending_trend_table(report.trend))
 
         self.changes_card.subtitle_label.setText(
-            f"Spending per category, this period vs the previous one · {view.comparison_label}"
+            tr("Spending per category, this period vs the previous one · {0}", view.comparison_label)
         )
         self.changes_card.chart.render(report.category_changes)
         self.changes_card.set_table(category_change_table(report.category_changes))
@@ -351,8 +392,9 @@ class StatisticsPage(BasePage):
         self.recurring_card.set_rows(RECURRING_HEADERS, view.recurring_rows, text_columns=3)
 
 
-def default_report_path(month: date) -> Path:
-    """``Money Manager 2026-09.pdf`` in the Documents folder."""
+def default_report_path(month: date, *, yearly: bool = False) -> Path:
+    """``Money Manager 2026-09.pdf`` (or ``Money Manager 2026.pdf``) in Documents."""
     location = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
     folder = Path(location) if location else Path.home()
-    return folder / f"Money Manager {month:%Y-%m}.pdf"
+    return folder / (tr("Money Manager {0:%Y}.pdf", month) if yearly
+                     else tr("Money Manager {0:%Y-%m}.pdf", month))

@@ -45,6 +45,8 @@ from money_manager.ui.subscriptions.view_model import (
     upcoming_row,
 )
 from money_manager.ui.theme import SIDE_BY_SIDE_MIN_WIDTH, Spacing
+from money_manager.core.i18n import tr
+from money_manager.ui.formatting import format_date
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +64,10 @@ class UpcomingPaymentsCard(Card):
     """Due and overdue payments, each with Record / Skip when it is next in line."""
 
     def __init__(self, page: "SubscriptionsPage") -> None:
-        super().__init__("Upcoming payments")
+        super().__init__(tr("Upcoming payments"))
         self._page = page
-        self.subtitle = QLabel("Confirm each payment when it happens: Record creates the "
-                               "expense, Skip moves on without one.")
+        self.subtitle = QLabel(tr("Confirm each payment when it happens: Record creates the "
+                               "expense, Skip moves on without one."))
         self.subtitle.setObjectName("MutedLabel")
         self.subtitle.setWordWrap(True)
         self.body.addWidget(self.subtitle)
@@ -74,7 +76,7 @@ class UpcomingPaymentsCard(Card):
         self._grid.setVerticalSpacing(Spacing.XS)
         self._grid.setColumnStretch(1, 1)
         self.body.addLayout(self._grid)
-        self.empty_label = QLabel("Nothing due in this period.")
+        self.empty_label = QLabel(tr("Nothing due in this period."))
         self.empty_label.setObjectName("MutedLabel")
         self.body.addWidget(self.empty_label)
         self.body.addStretch(1)
@@ -102,12 +104,12 @@ class UpcomingPaymentsCard(Card):
             amount = QLabel(row.amount)
             amount.setObjectName("AllocationAmount")
             amount.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            record = QPushButton("Record")
-            skip = QPushButton("Skip")
+            record = QPushButton(tr("Record"))
+            skip = QPushButton(tr("Skip"))
             for button in (record, skip):
                 button.setEnabled(row.can_be_confirmed)
                 if not row.can_be_confirmed:
-                    button.setToolTip("Confirm the earlier payment of this subscription first.")
+                    button.setToolTip(tr("Confirm the earlier payment of this subscription first."))
             record.clicked.connect(lambda _c=False, r=row: self._page.record_payment(
                 r.subscription_id, r.due_date))
             skip.clicked.connect(lambda _c=False, r=row: self._page.skip_payment(
@@ -126,21 +128,21 @@ class SubscriptionsPage(BasePage):
         self.stats: SubscriptionStats | None = None
         self._subscriptions: list[Subscription] = []
 
-        self.new_button = QPushButton("New subscription")
+        self.new_button = QPushButton(tr("New subscription"))
         self.new_button.setObjectName("PrimaryButton")
         self.new_button.clicked.connect(self.create_subscription)
-        self.new_button.setToolTip("New subscription (Ctrl+N)")
+        self.new_button.setToolTip(tr("New subscription (Ctrl+N)"))
         self.header.add_action(self.new_button)
         self.primary_button = self.new_button
 
         self.stat_cards = tuple(StatCard("", compact=True) for _ in range(4))
         self.stats_row = ResponsiveRow(self.stat_cards, min_item_width=190)
         self.upcoming_card = UpcomingPaymentsCard(self)
-        self.cost_card = ChartCard("Monthly cost by category", "Active subscriptions only",
+        self.cost_card = ChartCard(tr("Monthly cost by category"), tr("Active subscriptions only"),
                                    CategorySpendingChart())
 
         # Subscription list with row actions
-        self.list_card = Card("All subscriptions")
+        self.list_card = Card(tr("All subscriptions"))
         self.table = QTableWidget()
         self.table.setObjectName("DataTable")
         self.table.setColumnCount(len(TABLE_HEADERS))
@@ -159,11 +161,11 @@ class SubscriptionsPage(BasePage):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.itemSelectionChanged.connect(self._update_actions)
         self.table.doubleClicked.connect(lambda _index: self.edit_selected())
-        self.edit_button = QPushButton("Edit")
+        self.edit_button = QPushButton(tr("Edit"))
         self.edit_button.clicked.connect(self.edit_selected)
-        self.pause_button = QPushButton("Pause")
+        self.pause_button = QPushButton(tr("Pause"))
         self.pause_button.clicked.connect(self.toggle_selected)
-        self.delete_button = QPushButton("Delete")
+        self.delete_button = QPushButton(tr("Delete"))
         self.delete_button.setObjectName("DangerButton")
         self.delete_button.clicked.connect(self.delete_selected)
         actions = QHBoxLayout()
@@ -174,11 +176,11 @@ class SubscriptionsPage(BasePage):
         self.list_card.body.addLayout(actions)
 
         self.empty_state = EmptyState(
-            "No subscriptions yet",
-            "Add Netflix, your phone plan, internet or any other regular payment to see what "
-            "they cost per month and when the next ones are due.",
+            tr("No subscriptions yet"),
+            tr("Add Netflix, your phone plan, internet or any other regular payment to see what "
+            "they cost per month and when the next ones are due."),
             badge=None,
-            action_text="Add subscription",
+            action_text=tr("Add subscription"),
         )
         self.empty_state.action_clicked.connect(self.create_subscription)
 
@@ -223,7 +225,7 @@ class SubscriptionsPage(BasePage):
             names = {c.id: c.name for c in self._services.categories.list(include_archived=True)}
         except MoneyManagerError as exc:
             logger.warning("Could not load subscriptions: %s", exc)
-            dialogs.show_warning(self, "Could not load subscriptions", str(exc))
+            dialogs.show_warning(self, tr("Could not load subscriptions"), str(exc))
             return
         self.stats = stats
         self._subscriptions = list(stats.subscriptions)
@@ -294,9 +296,9 @@ class SubscriptionsPage(BasePage):
         if subscription is None:
             return
         if not dialogs.confirm_destructive(
-            self, "Delete subscription",
-            f"Delete the subscription “{subscription.name}”? Expenses already recorded for it "
-            "stay in your transactions.",
+            self, tr("Delete subscription"),
+            tr("Delete the subscription “{0}”? Expenses already recorded for it stay in "
+               "your transactions.", subscription.name),
         ):
             return
         self._run(lambda: self._services.subscriptions.delete(subscription.id))
@@ -314,10 +316,11 @@ class SubscriptionsPage(BasePage):
         if subscription is None:
             return
         choice = dialogs.choose(
-            self, "Skip payment",
-            f"Skip the payment of “{subscription.name}” due {due_date:%d %b %Y}? No expense is "
-            "recorded — use this if you already entered it or it was not charged.",
-            [(SKIP, "Skip payment")],
+            self, tr("Skip payment"),
+            tr("Skip the payment of “{0}” due {1}? No expense is recorded — use this if you "
+               "already entered it or it was not charged.", subscription.name,
+               format_date(due_date)),
+            [(SKIP, tr("Skip payment"))],
         )
         if choice == SKIP:
             self._run(lambda: self._services.subscriptions.skip_payment(subscription_id, due_date))
@@ -329,12 +332,12 @@ class SubscriptionsPage(BasePage):
         try:
             action()
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not update the subscription", str(exc))
+            dialogs.show_warning(self, tr("Could not update the subscription"), str(exc))
         self.refresh()
 
     def _update_actions(self) -> None:
         subscription = self.selected()
         for button in (self.edit_button, self.pause_button, self.delete_button):
             button.setEnabled(subscription is not None)
-        self.pause_button.setText("Resume" if subscription and not subscription.is_active
-                                  else "Pause")
+        self.pause_button.setText(tr("Resume") if subscription and not subscription.is_active
+                                  else tr("Pause"))

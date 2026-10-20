@@ -54,6 +54,7 @@ from money_manager.persistence.repositories import (
     InvestmentRepository,
     TransactionRepository,
 )
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +176,7 @@ class TransactionService:
     ) -> ValidTransaction:
         account_model = AccountRepository(session).get(validate_id(draft.account_id, "account_id"))
         if account_model is None:
-            raise ValidationError("The selected account does not exist.", "account_id")
+            raise ValidationError(tr("The selected account does not exist."), "account_id")
 
         category: Category | None = None
         if draft.category_id is not None:
@@ -183,7 +184,7 @@ class TransactionService:
                 validate_id(draft.category_id, "category_id")
             )
             if category_model is None:
-                raise ValidationError("The selected category does not exist.", "category_id")
+                raise ValidationError(tr("The selected category does not exist."), "category_id")
             category = category_to_domain(category_model)
 
         allocation: Allocation | None = None
@@ -210,21 +211,21 @@ def _validate_query(query: TransactionQuery) -> TransactionFilter:
     if isinstance(query.limit, bool) or not isinstance(query.limit, int) or not (
         1 <= query.limit <= MAX_PAGE_SIZE
     ):
-        raise ValidationError(f"Page size must be between 1 and {MAX_PAGE_SIZE}.", "limit")
+        raise ValidationError(tr("Page size must be between 1 and {0}.", MAX_PAGE_SIZE), "limit")
     if (isinstance(query.offset, bool) or not isinstance(query.offset, int)
             or not 0 <= query.offset <= MAX_RECORD_ID):
-        raise ValidationError("Offset must be between zero and the number of records.",
+        raise ValidationError(tr("Offset must be between zero and the number of records."),
                               "offset")
     filters = query.filters
     for value, field in ((filters.start, "start"), (filters.end, "end")):
         if value is not None and (isinstance(value, datetime) or not isinstance(value, date)):
-            raise ValidationError("Enter a valid calendar date.", field)
+            raise ValidationError(tr("Enter a valid calendar date."), field)
     if filters.start is not None and filters.end is not None and filters.start > filters.end:
-        raise ValidationError("The start date must not be after the end date.", "start")
+        raise ValidationError(tr("The start date must not be after the end date."), "start")
     search = filters.search.strip() if isinstance(filters.search, str) else ""
     if len(search) > MAX_SEARCH_LENGTH:
         raise ValidationError(
-            f"Search text cannot be longer than {MAX_SEARCH_LENGTH} characters.", "search"
+            tr("Search text cannot be longer than {0} characters.", MAX_SEARCH_LENGTH), "search"
         )
     return replace(filters, search=search)
 
@@ -238,7 +239,7 @@ TRANSFER_SIDE_MESSAGE = (
 def _check_transfer_link(session: Session, transaction_id: int) -> None:
     """Either side of an account transfer only changes together with the other."""
     if AccountTransferRepository(session).for_transaction(transaction_id) is not None:
-        raise ConflictError(TRANSFER_SIDE_MESSAGE)
+        raise ConflictError(tr(TRANSFER_SIDE_MESSAGE))
 
 
 def _check_investment_link(session: Session, transaction_id: int, draft: TransactionDraft) -> None:
@@ -246,8 +247,8 @@ def _check_investment_link(session: Session, transaction_id: int, draft: Transac
     entry = InvestmentRepository(session).entry_for_transaction(transaction_id)
     if entry is not None and parse_transaction_type(draft.type) is not TransactionType.EXPENSE:
         raise ValidationError(
-            "This expense is an investment contribution and must stay an expense. Delete it "
-            "on the Investments page instead.",
+            tr("This expense is an investment contribution and must stay an expense. Delete it "
+            "on the Investments page instead."),
             "type",
         )
 
@@ -284,9 +285,9 @@ def _check_allocations(session: Session, effects: AllocationEffects) -> None:
             model = repository.get(allocation_id)
             if model is not None and model.is_archived:
                 raise ValidationError(
-                    f"The allocation '{model.name}' is archived, and this change would put "
-                    "money back into it. Restore the allocation first, or record the "
-                    "transaction against Available.",
+                    tr("The allocation '{0}' is archived, and this change would put money back "
+                       "into it. Restore the allocation first, or record the transaction "
+                       "against Available.", model.name),
                     "allocation_id",
                 )
     decreases = {aid: change for aid, change in effects.items() if change < 0}
@@ -299,9 +300,8 @@ def _check_allocations(session: Session, effects: AllocationEffects) -> None:
             model = repository.get(allocation_id)
             name = model.name if model is not None else str(allocation_id)
             raise InsufficientFundsError(
-                f"The allocation '{name}' holds {Money.from_minor_units(current)}; this change "
-                f"would leave it at {Money.from_minor_units(current + change)}. Move money "
-                "into it first, or record the transaction against Available.",
+                tr("The allocation '{0}' holds {1}; this change would leave it at {2}. Move "
+                   "money into it first, or record the transaction against Available.", name, Money.from_minor_units(current), Money.from_minor_units(current + change)),
                 "allocation_id",
             )
 
@@ -321,5 +321,5 @@ def _apply(model: TransactionModel, valid: ValidTransaction) -> None:
 def _require(repository: TransactionRepository, transaction_id: int) -> TransactionModel:
     model = repository.get(transaction_id) if is_record_id(transaction_id) else None
     if model is None:
-        raise NotFoundError(f"Transaction {transaction_id!r} does not exist.")
+        raise NotFoundError(tr("Transaction {0!r} does not exist.", transaction_id))
     return model

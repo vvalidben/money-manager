@@ -25,6 +25,7 @@ from money_manager.services import AppServices
 from money_manager.ui.components import FormField
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.transaction_dialog import AMOUNT_INPUT_PATTERN, side_by_side
+from money_manager.core.i18n import tr
 
 
 class BudgetDialog(QDialog):
@@ -34,14 +35,14 @@ class BudgetDialog(QDialog):
         self._services = services
         self._editing = category_id is not None
         self.saved: Budget | None = None
-        self.setWindowTitle("Change budget" if self._editing else "New budget")
+        self.setWindowTitle(tr("Change budget") if self._editing else tr("New budget"))
         self.setModal(True)
         self.setMinimumWidth(420)
 
         self.category_combo = QComboBox()
-        self.category_combo.setAccessibleName("Category")
+        self.category_combo.setAccessibleName(tr("Category"))
         self.new_category_button = QToolButton()
-        self.new_category_button.setText("New…")
+        self.new_category_button.setText(tr("New…"))
         self.new_category_button.clicked.connect(self._prompt_new_category)
         self._fill_categories(category_id)
         if self._editing:
@@ -56,12 +57,12 @@ class BudgetDialog(QDialog):
         currency.setObjectName("MutedLabel")
 
         self.fields: dict[str, FormField] = {
-            "category_id": FormField("Category", side_by_side(
+            "category_id": FormField(tr("Category"), side_by_side(
                 self.category_combo, self.new_category_button), highlight=self.category_combo),
-            "amount": FormField("Monthly limit", side_by_side(self.amount_edit, currency),
+            "amount": FormField(tr("Monthly limit"), side_by_side(self.amount_edit, currency),
                                 highlight=self.amount_edit),
         }
-        note = QLabel("Compared with this category's spending in the current calendar month.")
+        note = QLabel(tr("Compared with this category's spending in the current calendar month."))
         note.setObjectName("MutedLabel")
         note.setWordWrap(True)
         self.form_error = QLabel()
@@ -72,7 +73,7 @@ class BudgetDialog(QDialog):
         self.buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         self.save_button = self.buttons.button(QDialogButtonBox.StandardButton.Save)
-        self.save_button.setText("Save budget")
+        self.save_button.setText(tr("Save budget"))
         self.save_button.setObjectName("PrimaryButton")
         self.save_button.setDefault(True)
         self.buttons.accepted.connect(self.submit)
@@ -101,7 +102,7 @@ class BudgetDialog(QDialog):
             self.category_combo.setCurrentIndex(self.category_combo.findData(selected))
 
     def _prompt_new_category(self) -> None:
-        name, accepted = QInputDialog.getText(self, "New expense category", "Category name:")
+        name, accepted = QInputDialog.getText(self, tr("New expense category"), tr("Category name:"))
         if not accepted or not name.strip():
             return
         try:
@@ -118,7 +119,7 @@ class BudgetDialog(QDialog):
         category_id = self.category_combo.currentData()
         if category_id is None:
             self.fields["category_id"].set_error(
-                "Choose a category, or create one with New….")
+                tr("Choose a category, or create one with New…."))
             return False
         try:
             self.saved = self._services.budgets.set(category_id,

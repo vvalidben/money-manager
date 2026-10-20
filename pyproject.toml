@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "money-manager"
-version = "1.4.0"
+version = "1.5.0"
 description = "Local-first personal money management desktop application."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,8 @@ dependencies = [
     "SQLAlchemy>=2.0",
     "matplotlib>=3.8",
     "alembic>=1.13",
+    # Password-protected backups (AES-256-GCM).
+    "cryptography>=43",
     # Windows Hello for the app lock.
     "winrt-runtime>=3.2; sys_platform == 'win32'",
     "winrt-Windows.Foundation>=3.2; sys_platform == 'win32'",

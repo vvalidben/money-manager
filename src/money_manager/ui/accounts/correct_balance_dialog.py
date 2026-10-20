@@ -24,6 +24,7 @@ from money_manager.ui.components import FormField
 from money_manager.ui.formatting import format_money
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.transaction_dialog import side_by_side
+from money_manager.core.i18n import tr
 
 
 class CorrectBalanceDialog(QDialog):
@@ -34,14 +35,14 @@ class CorrectBalanceDialog(QDialog):
         self._account = account
         self.submitted = False
         self.adjustment: Transaction | None = None  # None when nothing needed correcting
-        self.setWindowTitle(f"Correct the balance of {account.name}")
+        self.setWindowTitle(tr("Correct the balance of {0}", account.name))
         self.setModal(True)
         self.setMinimumWidth(420)
 
         intro = QLabel(
-            f"Money Manager shows {format_money(recorded)} today. Enter the balance your "
-            "bank (or wallet) shows; the difference is recorded as a balance adjustment, "
-            "so nothing is overwritten and you can see the correction in Transactions.")
+            tr("Money Manager shows {0} today. Enter the balance your bank (or wallet) "
+               "shows; the difference is recorded as a balance adjustment, so nothing "
+               "is overwritten and you can see the correction in Transactions.", format_money(recorded)))
         intro.setObjectName("CardBody")
         intro.setWordWrap(True)
         self.balance_edit = QLineEdit(str(recorded.amount))
@@ -49,13 +50,13 @@ class CorrectBalanceDialog(QDialog):
             QRegularExpressionValidator(QRegularExpression(OPENING_BALANCE_PATTERN), self))
         currency = QLabel(services.base_currency)
         currency.setObjectName("MutedLabel")
-        self.field = FormField("Actual balance today", side_by_side(self.balance_edit, currency),
+        self.field = FormField(tr("Actual balance today"), side_by_side(self.balance_edit, currency),
                                highlight=self.balance_edit)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         save = buttons.button(QDialogButtonBox.StandardButton.Save)
-        save.setText("Correct balance")
+        save.setText(tr("Correct balance"))
         save.setObjectName("PrimaryButton")
         save.setDefault(True)
         buttons.accepted.connect(self.submit)

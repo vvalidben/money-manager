@@ -6,13 +6,14 @@ from decimal import Decimal
 from money_manager.domain.goals import GoalProgress, GoalsSummary, GoalStatus
 from money_manager.ui.dashboard.view_model import StatView
 from money_manager.ui.formatting import format_date, format_money, format_percent
+from money_manager.core.i18n import tr
 
 STATUS_TEXT = {
-    GoalStatus.COMPLETED: "✓ Completed",
-    GoalStatus.ON_TRACK: "✓ On track",
-    GoalStatus.BEHIND: "! Behind",
-    GoalStatus.OVERDUE: "! Overdue",
-    GoalStatus.IN_PROGRESS: "● In progress",
+    GoalStatus.COMPLETED: tr("✓ Completed"),
+    GoalStatus.ON_TRACK: tr("✓ On track"),
+    GoalStatus.BEHIND: tr("! Behind"),
+    GoalStatus.OVERDUE: tr("! Overdue"),
+    GoalStatus.IN_PROGRESS: tr("● In progress"),
 }
 # Badge colours reuse the health-level styles (good / fair / poor / neutral).
 STATUS_LEVEL = {
@@ -53,16 +54,16 @@ def goal_card_view(item: GoalProgress) -> GoalCardView:
         amounts=f"{format_money(item.saved)} of {format_money(goal.target)}",
         percent=format_percent(item.progress),
         remaining=(
-            "Target reached"
+            tr("Target reached")
             if item.is_complete
-            else f"{format_money(item.remaining)} to go"
+            else tr("{0} to go", format_money(item.remaining))
         ),
         deadline=_deadline_text(item),
         pace=_pace_text(item),
         tracking=(
-            "Tracked manually — not part of your balance"
+            tr("Tracked manually — not part of your balance")
             if goal.is_manual
-            else f"Money kept in the allocation “{item.allocation_name or '?'}”"
+            else tr("Money kept in the allocation “{0}”", item.allocation_name or '?')
         ),
         is_manual=goal.is_manual,
     )
@@ -73,25 +74,25 @@ def summary_stats(summary: GoalsSummary) -> tuple[StatView, ...]:
     overall = summary.overall_progress
     return (
         StatView(
-            "Saved towards goals",
+            tr("Saved towards goals"),
             format_money(summary.total_saved),
             f"of {format_money(summary.total_target)}"
             + ("" if overall is None else f" · {format_percent(overall)}"),
         ),
         StatView(
-            "Active goals",
+            tr("Active goals"),
             str(len(summary.active)),
             f"{summary.completed_count} completed",
         ),
         StatView(
-            "Needed per month",
+            tr("Needed per month"),
             format_money(summary.required_per_month),
-            "To meet every deadline",
+            tr("To meet every deadline"),
         ),
         StatView(
-            "Behind or overdue",
+            tr("Behind or overdue"),
             str(behind),
-            "Goals below their expected pace" if behind else "Everything is on schedule",
+            tr("Goals below their expected pace") if behind else tr("Everything is on schedule"),
             "outflow" if behind else "neutral",
         ),
     )
@@ -100,23 +101,24 @@ def summary_stats(summary: GoalsSummary) -> tuple[StatView, ...]:
 def _deadline_text(item: GoalProgress) -> str:
     deadline, days_left = item.goal.deadline, item.days_left
     if deadline is None or days_left is None:
-        return "No deadline"
-    due = f"Due {format_date(deadline)}"
+        return tr("No deadline")
+    due = tr("Due {0}", format_date(deadline))
     if item.is_complete:
         return due
     if days_left < 0:
-        return f"{due} · overdue by {-days_left} {'day' if days_left == -1 else 'days'}"
+        return tr("{0} · overdue by {1} {2}", due, -days_left,
+                  tr("day") if days_left == -1 else tr("days"))
     if days_left == 0:
-        return f"{due} · due today"
-    return f"{due} · {days_left} {'day' if days_left == 1 else 'days'} left"
+        return tr("{0} · due today", due)
+    return tr("{0} · {1} {2} left", due, days_left, tr("day") if days_left == 1 else tr("days"))
 
 
 def _pace_text(item: GoalProgress) -> str:
     required = item.required_per_month
     if item.is_complete:
-        return "Well done — this goal is fully funded."
+        return tr("Well done — this goal is fully funded.")
     if item.status is GoalStatus.OVERDUE:
-        return "The deadline has passed. Edit the goal to set a new one."
+        return tr("The deadline has passed. Edit the goal to set a new one.")
     if required is None:
-        return "Set a deadline to see how much to save each month."
-    return f"Save {format_money(required)} per month to finish on time."
+        return tr("Set a deadline to see how much to save each month.")
+    return tr("Save {0} per month to finish on time.", format_money(required))

@@ -22,10 +22,12 @@ from money_manager.services.budget_service import BudgetService
 from money_manager.services.category_rule_service import CategoryRuleService
 from money_manager.services.category_service import CategoryService
 from money_manager.services.data_service import DataService
+from money_manager.services.debt_service import DebtService
 from money_manager.services.dashboard_service import DashboardService
 from money_manager.services.goal_service import GoalService
 from money_manager.services.investment_service import InvestmentService
 from money_manager.services.net_worth_service import NetWorthService
+from money_manager.services.receipt_service import ReceiptService
 from money_manager.services.recurring_service import RecurringService
 from money_manager.services.report_service import ReportService
 from money_manager.services.settings_service import SettingsService
@@ -33,6 +35,7 @@ from money_manager.services.statement_import_service import StatementImportServi
 from money_manager.services.statistics_service import StatisticsService
 from money_manager.services.subscription_service import SubscriptionService
 from money_manager.services.transaction_service import TransactionService
+from money_manager.services.update_service import UpdateService
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +58,9 @@ class AppServices:
     net_worth: NetWorthService
     reports: ReportService
     recurring: RecurringService
+    debts: DebtService
+    receipts: ReceiptService
+    updates: UpdateService
     analysis: FinancialAnalysisService
     ai: AIService
     settings: SettingsService
@@ -121,6 +127,9 @@ class AppServices:
             net_worth=net_worth,
             recurring=RecurringService(database, transactions, today=today,
                                        base_currency=base_currency),
+            debts=DebtService(database, transactions, today=today, base_currency=base_currency),
+            receipts=ReceiptService(database),
+            updates=UpdateService(settings, today=today),
             reports=ReportService(accounts=accounts, categories=categories,
                                   transactions=transactions, statistics=statistics,
                                   budgets=budgets, goals=goals, net_worth=net_worth,

@@ -40,6 +40,7 @@ from money_manager.persistence.mappers import insight_to_domain
 from money_manager.persistence.models import AIInsightModel
 from money_manager.persistence.repositories import AIInsightRepository, SettingRepository
 from money_manager.services.analysis_service import FinancialAnalysisService
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -133,12 +134,12 @@ class AIService:
         try:
             chosen = AIMode(mode)
         except ValueError:
-            raise ValidationError("Choose off, local, online or automatic.", "mode") from None
+            raise ValidationError(tr("Choose off, local, online or automatic."), "mode") from None
         try:
             return self.save_settings(self.settings().with_changes(mode=chosen))
         except ValidationError as exc:
             if exc.field == "local_model":
-                raise ValidationError("Choose a local model in Settings first.", "mode") from exc
+                raise ValidationError(tr("Choose a local model in Settings first."), "mode") from exc
             raise
 
     # ------------------------------------------------------------- requests
@@ -149,19 +150,19 @@ class AIService:
         """Build the request for a fixed task or a question (default: insights,
         or the question when one is given) about ``period`` (default: this month)."""
         if question is not None and not isinstance(question, str):
-            raise ValidationError("Type a question about your finances.", "question")
+            raise ValidationError(tr("Type a question about your finances."), "question")
         if kind is None:
             kind = InsightKind.QUESTION if question and question.strip() else InsightKind.INSIGHTS
         else:
             try:
                 kind = InsightKind(kind)
             except ValueError:
-                raise ValidationError("Choose what the advisor should do.", "kind") from None
+                raise ValidationError(tr("Choose what the advisor should do."), "kind") from None
         provider = self.provider()
         analysis = self._analysis.analyze(period)
         if not analysis.has_accounts:
-            raise ValidationError("There is no financial data to analyse yet. Create an "
-                                  "account and record some transactions first.")
+            raise ValidationError(tr("There is no financial data to analyse yet. Create an "
+                                  "account and record some transactions first."))
         context = build_financial_context(analysis, options)
         request = build_request(context, kind, question)
         disclosure = DataDisclosure(
@@ -204,7 +205,7 @@ class AIService:
             model = (AIInsightRepository(session).get(insight_id)
                      if is_record_id(insight_id) else None)
             if model is None:
-                raise NotFoundError("This insight no longer exists.")
+                raise NotFoundError(tr("This insight no longer exists."))
             return insight_to_domain(model)
 
     def delete_insight(self, insight_id: int) -> None:
@@ -212,7 +213,7 @@ class AIService:
             repository = AIInsightRepository(session)
             model = repository.get(insight_id) if is_record_id(insight_id) else None
             if model is None:
-                raise NotFoundError("This insight no longer exists.")
+                raise NotFoundError(tr("This insight no longer exists."))
             repository.delete(model)
         logger.info("AI insight %s deleted", insight_id)
 

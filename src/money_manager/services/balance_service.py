@@ -21,6 +21,7 @@ from money_manager.persistence.database import Database
 from money_manager.persistence.mappers import account_to_domain
 from money_manager.persistence.repositories import AccountRepository, TransactionRepository
 from money_manager.services.transaction_service import TransactionService
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,8 @@ class BalanceService:
         Records the difference as a balance adjustment; the balance is never
         overwritten directly. Returns None when no correction is needed.
         """
+        if description == DEFAULT_CORRECTION_DESCRIPTION:
+            description = tr(DEFAULT_CORRECTION_DESCRIPTION)
         target_amount = parse_amount(actual_balance, "actual_balance")
         on_date = self._today() if on is None else on
         with self._database.session() as session:
@@ -106,12 +109,11 @@ class BalanceService:
         as_of = _check_as_of(as_of)
         model = AccountRepository(session).get(account_id) if is_record_id(account_id) else None
         if model is None:
-            raise NotFoundError(f"Account {account_id!r} does not exist.")
+            raise NotFoundError(tr("Account {0!r} does not exist.", account_id))
         account = account_to_domain(model)
         if as_of is not None and as_of < account.opening_date:
             raise ValidationError(
-                f"No balance exists before the account's opening date "
-                f"({account.opening_date.isoformat()}).",
+                tr("No balance exists before the account's opening date ({0}).", account.opening_date.isoformat()),
                 "as_of",
             )
         totals = TransactionRepository(session).totals_by_type(account.id, as_of)
@@ -122,5 +124,5 @@ def _check_as_of(as_of: object) -> date | None:
     if as_of is None:
         return None
     if isinstance(as_of, datetime) or not isinstance(as_of, date):
-        raise ValidationError("Enter a valid calendar date.", "as_of")
+        raise ValidationError(tr("Enter a valid calendar date."), "as_of")
     return as_of

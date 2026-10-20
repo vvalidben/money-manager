@@ -23,6 +23,7 @@ from money_manager.domain.entities import Transaction
 from money_manager.domain.enums import TransactionSort
 from money_manager.ui.theme import FONT_FAMILY, Colors, identity_color, mono_font
 from money_manager.ui.transactions.rows import NO_DESCRIPTION, TransactionRow
+from money_manager.core.i18n import tr
 
 ModelIndex = QModelIndex | QPersistentModelIndex
 
@@ -36,11 +37,11 @@ class Column(IntEnum):
 
 
 HEADERS = {
-    Column.DATE: "Date",
-    Column.DESCRIPTION: "Description",
-    Column.CATEGORY: "Category",
-    Column.TYPE: "Type",
-    Column.AMOUNT: "Amount",
+    Column.DATE: tr("Date"),
+    Column.DESCRIPTION: tr("Description"),
+    Column.CATEGORY: tr("Category"),
+    Column.TYPE: tr("Type"),
+    Column.AMOUNT: tr("Amount"),
 }
 SORT_KEYS = {
     Column.DATE: TransactionSort.DATE,

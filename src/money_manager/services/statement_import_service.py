@@ -40,6 +40,7 @@ from money_manager.domain.validation import MAX_DESCRIPTION_LENGTH, validate_id
 from money_manager.persistence.database import Database
 from money_manager.services.category_rule_service import CategoryRuleService
 from money_manager.services.transaction_service import TransactionService
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +104,10 @@ class StatementImportService:
         """The file's header and rows (separator and encoding detected)."""
         try:
             if path.stat().st_size > MAX_STATEMENT_BYTES:
-                raise ValidationError("The file is too large for a bank statement.", "path")
+                raise ValidationError(tr("The file is too large for a bank statement."), "path")
             raw = path.read_bytes()
         except OSError as exc:
-            raise ValidationError(f"Could not read the file: {exc.strerror or exc}",
+            raise ValidationError(tr("Could not read the file: {0}", exc.strerror or exc),
                                   "path") from exc
         for encoding in ENCODINGS:
             try:
@@ -115,10 +116,10 @@ class StatementImportService:
             except UnicodeDecodeError:
                 continue
         else:  # pragma: no cover - cp1252 decodes almost anything
-            raise ValidationError("The file's text encoding is not supported.", "path")
+            raise ValidationError(tr("The file's text encoding is not supported."), "path")
         table = read_table(text)
         if not table.header or not table.rows:
-            raise ValidationError("The file has no lines to import.", "path")
+            raise ValidationError(tr("The file has no lines to import."), "path")
         return table
 
     def preview(self, table: StatementTable, account_id: int, columns: StatementColumns,
@@ -143,7 +144,7 @@ class StatementImportService:
         account_id = validate_id(account_id, "account_id")
         recorded = self._recorded(account_id, lines)
         rules = self._rules.rules()
-        note = f"Imported from {source}" if source else "Imported from a bank statement"
+        note = tr("Imported from {0}", source) if source else tr("Imported from a bank statement")
         imported, duplicates = 0, 0
         problems: list[StatementProblem] = []
         with self._database.session() as session:

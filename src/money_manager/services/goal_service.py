@@ -42,6 +42,7 @@ from money_manager.services.allocation_service import (
     create_allocation_in_session,
 )
 from money_manager.services.allocation_transfer_service import transfer_in_session
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -119,16 +120,16 @@ class GoalService:
             self._ensure_name_available(session, valid.name)
             allocation = AllocationRepository(session).get(validate_id(allocation_id, "allocation_id"))
             if allocation is None:
-                raise ValidationError("The selected allocation does not exist.", "allocation_id")
+                raise ValidationError(tr("The selected allocation does not exist."), "allocation_id")
             if allocation.is_archived:
                 raise ValidationError(
-                    f"The allocation '{allocation.name}' is archived.", "allocation_id"
+                    tr("The allocation '{0}' is archived.", allocation.name), "allocation_id"
                 )
             linked = GoalRepository(session).get_by_allocation(allocation.id)
             if linked is not None:
                 raise ConflictError(
-                    f"The allocation '{allocation.name}' already holds the money for the goal "
-                    f"'{linked.name}'. Money can count towards only one goal."
+                    tr("The allocation '{0}' already holds the money for the goal '{1}'. Money "
+                       "can count towards only one goal.", allocation.name, linked.name)
                 )
             model = self._add(session, valid, allocation_id=allocation.id, manual_minor=None)
             progress = _progress(session, model, self._currency, today)
@@ -190,8 +191,8 @@ class GoalService:
             model = _require(GoalRepository(session), goal_id)
             if model.allocation_id is not None:
                 raise ValidationError(
-                    "This goal's progress is the balance of its allocation; add or withdraw "
-                    "money instead.",
+                    tr("This goal's progress is the balance of its allocation; add or withdraw "
+                    "money instead."),
                     "amount",
                 )
             model.manual_current_minor = value.minor_units
@@ -242,12 +243,13 @@ class GoalService:
                 new_minor = model.manual_current_minor + change
                 if new_minor < 0:
                     raise ValidationError(
-                        "You cannot withdraw more than the goal's recorded amount.", "amount"
+                        tr("You cannot withdraw more than the goal's recorded amount."), "amount"
                     )
                 model.manual_current_minor = new_minor
                 session.flush()
             else:
-                note = (CONTRIBUTION_NOTE if into_goal else WITHDRAWAL_NOTE).format(name=model.name)
+                note = tr(CONTRIBUTION_NOTE if into_goal else WITHDRAWAL_NOTE).format(
+                    name=model.name)
                 transfer_in_session(
                     session,
                     from_allocation_id=None if into_goal else model.allocation_id,
@@ -302,7 +304,7 @@ class GoalService:
     def _ensure_name_available(session: Session, name: str, exclude_id: int | None = None) -> None:
         existing = GoalRepository(session).get_by_normalized_name(normalize_name(name))
         if existing is not None and existing.id != exclude_id:
-            raise ConflictError(f"A goal named '{existing.name}' already exists.")
+            raise ConflictError(tr("A goal named '{0}' already exists.", existing.name))
 
 
 def goal_progress_in_session(session: Session, currency: str, today: date) -> list[GoalProgress]:
@@ -345,5 +347,5 @@ def build_goal_progress(
 def _require(repository: GoalRepository, goal_id: int) -> GoalModel:
     model = repository.get(goal_id) if is_record_id(goal_id) else None
     if model is None:
-        raise NotFoundError(f"Goal {goal_id!r} does not exist.")
+        raise NotFoundError(tr("Goal {0!r} does not exist.", goal_id))
     return model

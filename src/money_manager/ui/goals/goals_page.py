@@ -24,6 +24,7 @@ from money_manager.ui.goals.view_model import goal_card_view, summary_stats
 from money_manager.ui.pages.base_page import BasePage
 from money_manager.ui.pages.registry import PageSpec
 from money_manager.ui.theme import Spacing
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,10 @@ class GoalsPage(BasePage):
         self.summary: GoalsSummary | None = None
         self.cards: list[GoalCard] = []
 
-        self.new_button = QPushButton("New goal")
+        self.new_button = QPushButton(tr("New goal"))
         self.new_button.setObjectName("PrimaryButton")
         self.new_button.clicked.connect(self.create_goal)
-        self.new_button.setToolTip("New goal (Ctrl+N)")
+        self.new_button.setToolTip(tr("New goal (Ctrl+N)"))
         self.header.add_action(self.new_button)
         self.primary_button = self.new_button
 
@@ -50,11 +51,11 @@ class GoalsPage(BasePage):
         self.stats_row = ResponsiveRow(self.stat_cards, min_item_width=190)
 
         self.empty_state = EmptyState(
-            "No goals yet",
-            "Create a goal such as an emergency fund, a trip or a new laptop. Keep its money "
-            "in an allocation and track your progress towards the target.",
+            tr("No goals yet"),
+            tr("Create a goal such as an emergency fund, a trip or a new laptop. Keep its money "
+            "in an allocation and track your progress towards the target."),
             badge=None,
-            action_text="Create goal",
+            action_text=tr("Create goal"),
         )
         self.empty_state.action_clicked.connect(self.create_goal)
 
@@ -95,7 +96,7 @@ class GoalsPage(BasePage):
             summary = self._services.goals.summary()
         except MoneyManagerError as exc:
             logger.warning("Could not load goals: %s", exc)
-            dialogs.show_warning(self, "Could not load goals", str(exc))
+            dialogs.show_warning(self, tr("Could not load goals"), str(exc))
             return
         self.summary = summary
         for card, stat in zip(self.stat_cards, summary_stats(summary), strict=True):
@@ -159,18 +160,18 @@ class GoalsPage(BasePage):
         name = goal.goal.name
         if goal.goal.is_manual:
             if not dialogs.confirm_destructive(
-                self, "Delete goal", f"Delete the goal “{name}”? This cannot be undone."
+                self, tr("Delete goal"), tr("Delete the goal “{0}”? This cannot be undone.", name)
             ):
                 return
             release = False
         else:
             choice = dialogs.choose(
                 self,
-                "Delete goal",
-                f"Delete the goal “{name}”? Its money stays in your balance either way.",
+                tr("Delete goal"),
+                tr("Delete the goal “{0}”? Its money stays in your balance either way.", name),
                 [
-                    (KEEP_MONEY, f"Keep the money in “{goal.allocation_name}”"),
-                    (RELEASE_MONEY, "Move the money back to Available"),
+                    (KEEP_MONEY, tr("Keep the money in “{0}”", goal.allocation_name)),
+                    (RELEASE_MONEY, tr("Move the money back to Available")),
                 ],
             )
             if choice is None:
@@ -179,7 +180,7 @@ class GoalsPage(BasePage):
         try:
             self._services.goals.delete(goal_id, release_money=release)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not delete goal", str(exc))
+            dialogs.show_warning(self, tr("Could not delete goal"), str(exc))
             return
         self.refresh()
 
@@ -190,6 +191,6 @@ class GoalsPage(BasePage):
         try:
             return self._services.goals.get(goal_id)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Goal not available", str(exc))
+            dialogs.show_warning(self, tr("Goal not available"), str(exc))
             self.refresh()
             return None

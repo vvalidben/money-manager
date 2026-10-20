@@ -22,6 +22,7 @@ from money_manager.persistence.repositories import (
 )
 from money_manager.services.allocation_ledger import AllocationLedger
 from money_manager.services.balance_service import BalanceService
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class AllocationService:
         clean = validate_allocation_name(name)
         amount = parse_amount(initial_amount, "initial_amount")
         if amount < 0:
-            raise ValidationError("The initial amount cannot be negative.", "initial_amount")
+            raise ValidationError(tr("The initial amount cannot be negative."), "initial_amount")
 
         with self._database.session() as session:
             model = create_allocation_in_session(
@@ -132,8 +133,7 @@ class AllocationService:
             _ensure_not_backing_a_goal(session, model)
             if repository.has_history(model.id):
                 raise ConflictError(
-                    f"The allocation '{model.name}' has transfers or transactions; "
-                    "archive it instead."
+                    tr("The allocation '{0}' has transfers or transactions; archive it instead.", model.name)
                 )
             repository.delete(model)
         logger.info("Deleted allocation %s", allocation_id)
@@ -153,14 +153,14 @@ class AllocationService:
                 issues.append(
                     ConsistencyIssue(
                         "negative_allocation",
-                        f"The allocation '{model.name}' is negative ({balance}).",
+                        tr("The allocation '{0}' is negative ({1}).", model.name, balance),
                     )
                 )
             if model.is_archived and not balance.is_zero():
                 issues.append(
                     ConsistencyIssue(
                         "archived_with_balance",
-                        f"The archived allocation '{model.name}' still holds {balance}.",
+                        tr("The archived allocation '{0}' still holds {1}.", model.name, balance),
                     )
                 )
 
@@ -169,15 +169,15 @@ class AllocationService:
             issues.append(
                 ConsistencyIssue(
                     "total_mismatch",
-                    f"Total balance mismatch: {summary.total_balance} vs {independent_total}.",
+                    tr("Total balance mismatch: {0} vs {1}.", summary.total_balance, independent_total),
                 )
             )
         if summary.is_over_allocated:
             issues.append(
                 ConsistencyIssue(
                     "over_allocated",
-                    f"Allocations exceed the real balance by {summary.shortfall}; move money "
-                    "from an allocation back to Available.",
+                    tr("Allocations exceed the real balance by {0}; move money from an "
+                       "allocation back to Available.", summary.shortfall),
                 )
             )
         if issues:
@@ -206,7 +206,7 @@ def create_allocation_in_session(
                 to_allocation_id=model.id,
                 amount_minor=initial_amount.minor_units,
                 occurred_on=today,
-                note=INITIAL_ALLOCATION_NOTE,
+                note=tr(INITIAL_ALLOCATION_NOTE),
             )
         )
     return model
@@ -221,7 +221,7 @@ def archive_allocation_in_session(
     balance = AllocationLedger(session, currency).balance_of(model.id)
     if balance.is_negative():
         raise ConflictError(
-            f"The allocation '{model.name}' has a negative balance; run a consistency check."
+            tr("The allocation '{0}' has a negative balance; run a consistency check.", model.name)
         )
     if balance.is_positive():
         AllocationTransferRepository(session).add(
@@ -230,7 +230,7 @@ def archive_allocation_in_session(
                 to_allocation_id=None,
                 amount_minor=balance.minor_units,
                 occurred_on=today,
-                note=RELEASED_ON_ARCHIVE_NOTE,
+                note=tr(RELEASED_ON_ARCHIVE_NOTE),
             )
         )
     model.is_archived = True
@@ -241,8 +241,8 @@ def _ensure_not_backing_a_goal(session: Session, model: AllocationModel) -> None
     goal = GoalRepository(session).get_by_allocation(model.id)
     if goal is not None:
         raise ConflictError(
-            f"The allocation '{model.name}' holds the money for the goal '{goal.name}'; "
-            "delete the goal first."
+            tr("The allocation '{0}' holds the money for the goal '{1}'; delete the "
+               "goal first.", model.name, goal.name)
         )
 
 
@@ -251,11 +251,11 @@ def _ensure_name_available(
 ) -> None:
     existing = repository.get_by_normalized_name(normalize_name(name))
     if existing is not None and existing.id != exclude_id:
-        raise ConflictError(f"An allocation named '{existing.name}' already exists.")
+        raise ConflictError(tr("An allocation named '{0}' already exists.", existing.name))
 
 
 def _require(repository: AllocationRepository, allocation_id: int) -> AllocationModel:
     model = repository.get(allocation_id) if is_record_id(allocation_id) else None
     if model is None:
-        raise NotFoundError(f"Allocation {allocation_id!r} does not exist.")
+        raise NotFoundError(tr("Allocation {0!r} does not exist.", allocation_id))
     return model

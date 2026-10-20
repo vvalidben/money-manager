@@ -16,6 +16,8 @@ from money_manager.persistence.models.investment import (
     InvestmentValuationModel,
 )
 from money_manager.persistence.models.setting import SettingModel
+from money_manager.persistence.models.debt import DebtModel, DebtPaymentModel
+from money_manager.persistence.models.receipt import ReceiptModel
 from money_manager.persistence.models.recurring import RecurringEntryModel
 from money_manager.persistence.models.subscription import (
     SubscriptionModel,
@@ -37,6 +39,9 @@ __all__ = [
     "InvestmentEntryModel",
     "InvestmentModel",
     "InvestmentValuationModel",
+    "DebtModel",
+    "DebtPaymentModel",
+    "ReceiptModel",
     "RecurringEntryModel",
     "SettingModel",
     "SubscriptionModel",

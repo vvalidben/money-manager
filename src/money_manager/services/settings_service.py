@@ -11,6 +11,7 @@ import logging
 import platform
 import sqlite3
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 from money_manager import APP_NAME, __version__
@@ -21,6 +22,9 @@ from money_manager.persistence.database import CREATED_AT_KEY, Database
 from money_manager.persistence.migrator import current_revision
 from money_manager.persistence.models import AppMetadata
 from money_manager.persistence.repositories import AccountRepository, SettingRepository
+from money_manager.core.i18n import CHOICES as LANGUAGE_CHOICES
+from money_manager.core.i18n import DEFAULT_CHOICE as DEFAULT_LANGUAGE
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +34,9 @@ DAILY_COPIES_KEY = "daily_copies"
 APP_LOCK_KEY = "app_lock"
 LOCK_AFTER_KEY = "lock_after_minutes"
 THEME_KEY = "theme"
+UPDATE_CHECK_KEY = "update_check"
+LANGUAGE_KEY = "language"
+LAST_UPDATE_CHECK_KEY = "last_update_check"
 
 LOCK_AFTER_CHOICES = (1, 5, 15, 30, 0)  # minutes without use; 0 = only when asked
 DEFAULT_LOCK_AFTER = 5
@@ -81,8 +88,8 @@ class SettingsService:
             accounts = AccountRepository(session).list_all()
             if accounts and any(a.currency != currency for a in accounts):
                 raise ConflictError(
-                    "The currency can only be changed before any account exists, because "
-                    "Money Manager never converts amounts between currencies.")
+                    tr("The currency can only be changed before any account exists, because "
+                    "Money Manager never converts amounts between currencies."))
             SettingRepository(session).set(CURRENCY_KEY, json.dumps(currency))
         logger.info("Base currency set to %s", currency)
         return currency
@@ -123,7 +130,7 @@ class SettingsService:
 
     def set_lock_after_minutes(self, minutes: int) -> int:
         if isinstance(minutes, bool) or minutes not in LOCK_AFTER_CHOICES:
-            raise ValidationError("Choose one of the offered lock times.", "lock_after")
+            raise ValidationError(tr("Choose one of the offered lock times."), "lock_after")
         with self._database.session() as session:
             SettingRepository(session).set(LOCK_AFTER_KEY, json.dumps(minutes))
         logger.info("Lock after %s minutes", minutes)
@@ -138,11 +145,46 @@ class SettingsService:
 
     def set_theme(self, theme: str) -> str:
         if theme not in THEMES:
-            raise ValidationError("Choose dark, light or the Windows setting.", "theme")
+            raise ValidationError(tr("Choose dark, light or the Windows setting."), "theme")
         with self._database.session() as session:
             SettingRepository(session).set(THEME_KEY, json.dumps(theme))
         logger.info("Theme set to %s", theme)
         return theme
+
+    # ------------------------------------------------------------- language
+
+    def language(self) -> str:
+        """``system`` (Windows' display language), ``en`` or ``fr``."""
+        value = self._stored(LANGUAGE_KEY, "language")
+        return value if value in LANGUAGE_CHOICES else DEFAULT_LANGUAGE
+
+    def set_language(self, choice: str) -> str:
+        if choice not in LANGUAGE_CHOICES:
+            raise ValidationError(tr("Choose one of the offered languages."), "language")
+        with self._database.session() as session:
+            SettingRepository(session).set(LANGUAGE_KEY, json.dumps(choice))
+        logger.info("Language set to %s", choice)
+        return choice
+
+    # -------------------------------------------------------------- updates
+
+    def update_check_enabled(self) -> bool:
+        """Whether to look for a newer version once a day (off by default)."""
+        return self._flag(UPDATE_CHECK_KEY, "update check", default=False)
+
+    def set_update_check_enabled(self, enabled: bool) -> bool:
+        return self._set_flag(UPDATE_CHECK_KEY, "Update check", enabled)
+
+    def last_update_check(self) -> date | None:
+        value = self._stored(LAST_UPDATE_CHECK_KEY, "last update check")
+        try:
+            return date.fromisoformat(value) if isinstance(value, str) else None
+        except ValueError:
+            return None
+
+    def set_last_update_check(self, day: date) -> None:
+        with self._database.session() as session:
+            SettingRepository(session).set(LAST_UPDATE_CHECK_KEY, json.dumps(day.isoformat()))
 
     # -------------------------------------------------------------- helpers
 

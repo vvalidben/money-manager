@@ -25,6 +25,7 @@ from money_manager.ui.allocations.view_model import AVAILABLE
 from money_manager.ui.components import FormField
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.transaction_dialog import AMOUNT_INPUT_PATTERN, side_by_side
+from money_manager.core.i18n import tr
 
 
 class _FormDialog(QDialog):
@@ -95,17 +96,17 @@ class AllocationDialog(_FormDialog):
 
     def __init__(self, services: AppServices, parent: QWidget | None = None) -> None:
         super().__init__(
-            "New allocation",
-            "An allocation sets money aside for a purpose, such as bills or a holiday. The "
-            "money stays in your accounts; it is only no longer Available to spend.",
-            "Create allocation", parent)
+            tr("New allocation"),
+            tr("An allocation sets money aside for a purpose, such as bills or a holiday. The "
+            "money stays in your accounts; it is only no longer Available to spend."),
+            tr("Create allocation"), parent)
         self._services = services
         self.saved: Allocation | None = None
         self.name_edit = QLineEdit()
         self.name_edit.setMaxLength(MAX_ALLOCATION_NAME_LENGTH)
-        self.name_edit.setPlaceholderText("e.g. Bills, Holiday, Emergency fund")
-        self.fields["name"] = FormField("Name", self.name_edit)
-        self.amount_edit = self._amount_field(services, "Set aside now (from Available)")
+        self.name_edit.setPlaceholderText(tr("e.g. Bills, Holiday, Emergency fund"))
+        self.fields["name"] = FormField(tr("Name"), self.name_edit)
+        self.amount_edit = self._amount_field(services, tr("Set aside now (from Available)"))
         self.amount_edit.setText("0")
         self._build()
 
@@ -130,9 +131,9 @@ class MoveMoneyDialog(_FormDialog):
     def __init__(self, services: AppServices, *, from_id: int | None = None,
                  to_id: int | None = None, parent: QWidget | None = None) -> None:
         super().__init__(
-            "Move money",
-            "Moves money between your allocations and Available. Your accounts and your "
-            "total balance do not change.", "Move", parent)
+            tr("Move money"),
+            tr("Moves money between your allocations and Available. Your accounts and your "
+            "total balance do not change."), tr("Move"), parent)
         self._services = services
         self.saved: AllocationTransfer | None = None
         allocations = services.allocations.list()
@@ -144,13 +145,13 @@ class MoveMoneyDialog(_FormDialog):
         # "Available" is the first item (no id); findData(None) does not find it.
         self.from_combo.setCurrentIndex(0 if from_id is None else self.from_combo.findData(from_id))
         self.to_combo.setCurrentIndex(0 if to_id is None else self.to_combo.findData(to_id))
-        self.fields["from_allocation_id"] = FormField("From", self.from_combo)
-        self.fields["to_allocation_id"] = FormField("To", self.to_combo)
-        self.amount_edit = self._amount_field(services, "Amount")
+        self.fields["from_allocation_id"] = FormField(tr("From"), self.from_combo)
+        self.fields["to_allocation_id"] = FormField(tr("To"), self.to_combo)
+        self.amount_edit = self._amount_field(services, tr("Amount"))
         self.note_edit = QLineEdit()
         self.note_edit.setMaxLength(MAX_TRANSFER_NOTE_LENGTH)
-        self.note_edit.setPlaceholderText("Optional")
-        self.fields["note"] = FormField("Note", self.note_edit)
+        self.note_edit.setPlaceholderText(tr("Optional"))
+        self.fields["note"] = FormField(tr("Note"), self.note_edit)
         self._build()
 
     def submit(self) -> bool:

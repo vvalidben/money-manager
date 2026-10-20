@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
 
+from money_manager.core.i18n import tr
 from money_manager.domain.periods import (
     DateRange,
     StatsRange,
@@ -87,4 +88,4 @@ class Insight:
     def title(self) -> str:
         if self.kind is InsightKind.QUESTION:
             return self.question
-        return KIND_LABELS[self.kind]
+        return tr(KIND_LABELS[self.kind])

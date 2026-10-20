@@ -141,3 +141,44 @@ class TestPage:
 
     def test_default_file_name(self) -> None:
         assert default_report_path(date(2026, 9, 1)).name == "Money Manager 2026-09.pdf"
+
+
+class TestYearly:
+    def test_service(self, app_services: AppServices, data: object) -> None:
+        from money_manager.domain.periods import DateRange
+
+        assert app_services.reports.years() == [2026]
+        report = app_services.reports.yearly(2026)
+        assert report.period == DateRange(date(2026, 1, 1), date(2026, 6, 15))
+        assert not report.is_complete
+        assert report.statistics.previous_period == DateRange(date(2025, 1, 1),
+                                                              date(2025, 6, 15))
+        assert report.statistics.totals.income == Money.of("10200")
+        assert [m.month.month for m in report.months] == [1, 2, 3, 4, 5, 6]
+        assert report.best_month is not None and report.best_month.month == date(2026, 4, 1)
+        assert report.worst_month is not None and report.worst_month.month == date(2026, 6, 1)
+        assert [p.month.month for p in report.net_worth] == [4, 5, 6]
+        with pytest.raises(ValidationError):
+            app_services.reports.yearly(2025)
+
+    def test_pdf(self, qapp: QApplication, app_services: AppServices, data: object,
+                 tmp_path: Path) -> None:
+        from money_manager.ui.reports.yearly_pdf import report_html, write_yearly_report
+
+        report = app_services.reports.yearly(2026)
+        html = report_html(report)
+        for text in ("2026", "year to date", "Month by month", "Apr 2026", "Best month",
+                     "Food &amp; &lt;drinks&gt;", "Rent &lt;May&gt;", "Jun 2026 (to date)"):
+            assert text in html
+        path = tmp_path / "2026.pdf"
+        write_yearly_report(report, path)
+        assert path.read_bytes().startswith(b"%PDF")
+
+    def test_page_button(self, page: StatisticsPage, data: object, tmp_path: Path,
+                         monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(page, "ask_report_year", lambda years: years[0])
+        monkeypatch.setattr(page, "ask_report_path", lambda suggested: tmp_path / suggested.name)
+        opened: list[Path] = []
+        monkeypatch.setattr(page, "open_report", opened.append)
+        page.yearly_button.click()
+        assert opened == [tmp_path / "Money Manager 2026.pdf"] and opened[0].is_file()

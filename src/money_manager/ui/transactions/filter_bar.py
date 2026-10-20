@@ -11,25 +11,26 @@ from money_manager.domain.enums import TransactionType
 from money_manager.domain.periods import DatePreset, preset_range
 from money_manager.ui.components.flow import FlowLayout, compact_combo
 from money_manager.ui.theme import Spacing
+from money_manager.core.i18n import tr
 
 SEARCH_DELAY_MS = 250
 
 PERIOD_LABELS = {
-    DatePreset.ALL_TIME: "All time",
-    DatePreset.THIS_MONTH: "This month",
-    DatePreset.LAST_MONTH: "Last month",
-    DatePreset.LAST_30_DAYS: "Last 30 days",
-    DatePreset.THIS_YEAR: "This year",
-    DatePreset.LAST_YEAR: "Last year",
-    DatePreset.CUSTOM: "Custom range…",
+    DatePreset.ALL_TIME: tr("All time"),
+    DatePreset.THIS_MONTH: tr("This month"),
+    DatePreset.LAST_MONTH: tr("Last month"),
+    DatePreset.LAST_30_DAYS: tr("Last 30 days"),
+    DatePreset.THIS_YEAR: tr("This year"),
+    DatePreset.LAST_YEAR: tr("Last year"),
+    DatePreset.CUSTOM: tr("Custom range…"),
 }
 
 # (label, types) — None means every type.
 TYPE_OPTIONS: tuple[tuple[str, frozenset[TransactionType] | None], ...] = (
-    ("All types", None),
-    ("Income", frozenset({TransactionType.INCOME})),
-    ("Expenses", frozenset({TransactionType.EXPENSE})),
-    ("Adjustments", frozenset(t for t in TransactionType if t.is_adjustment)),
+    (tr("All types"), None),
+    (tr("Income"), frozenset({TransactionType.INCOME})),
+    (tr("Expenses"), frozenset({TransactionType.EXPENSE})),
+    (tr("Adjustments"), frozenset(t for t in TransactionType if t.is_adjustment)),
 )
 
 
@@ -47,10 +48,10 @@ class FilterBar(QWidget):
         self._today = today
 
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("Search description, notes, category or amount")
+        self.search_edit.setPlaceholderText(tr("Search description, notes, category or amount"))
         self.search_edit.setClearButtonEnabled(True)
         self.search_edit.setMinimumWidth(240)
-        self.search_edit.setAccessibleName("Search transactions")
+        self.search_edit.setAccessibleName(tr("Search transactions"))
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(SEARCH_DELAY_MS)
@@ -80,15 +81,15 @@ class FilterBar(QWidget):
         self.account_combo = QComboBox()
         self.account_combo.currentIndexChanged.connect(self.changed)
 
-        self.clear_button = QPushButton("Clear filters")
+        self.clear_button = QPushButton(tr("Clear filters"))
         self.clear_button.clicked.connect(self.clear)
 
-        for combo, name in ((self.period_combo, "Period"), (self.type_combo, "Type"),
-                            (self.category_combo, "Category"), (self.account_combo, "Account")):
-            combo.setAccessibleName(f"Filter by {name.lower()}")
+        for combo, name in ((self.period_combo, tr("Period")), (self.type_combo, tr("Type")),
+                            (self.category_combo, tr("Category")), (self.account_combo, tr("Account"))):
+            combo.setAccessibleName(tr("Filter by {0}", name.lower()))
             compact_combo(combo, 10)
-        self.start_edit.setAccessibleName("From date")
-        self.end_edit.setAccessibleName("To date")
+        self.start_edit.setAccessibleName(tr("From date"))
+        self.end_edit.setAccessibleName(tr("To date"))
 
         # Wraps onto a second line in narrow windows instead of overlapping.
         layout = FlowLayout(self, Spacing.SM)
@@ -156,10 +157,10 @@ class FilterBar(QWidget):
             (f"{c.name} ({c.kind.value}{', archived' if c.is_archived else ''})", c.id)
             for c in sorted(categories, key=lambda c: (c.kind.value, c.name.casefold()))
         ]
-        self._replace_items(self.category_combo, "All categories", options)
+        self._replace_items(self.category_combo, tr("All categories"), options)
 
     def set_accounts(self, accounts: Sequence[Account]) -> None:
-        self._replace_items(self.account_combo, "All accounts", [(a.name, a.id) for a in accounts])
+        self._replace_items(self.account_combo, tr("All accounts"), [(a.name, a.id) for a in accounts])
         # Only worth showing when there is a choice to make.
         self.account_combo.setVisible(len(accounts) > 1)
 

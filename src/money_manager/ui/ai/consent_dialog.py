@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from money_manager.ai.privacy import DataDisclosure, OnlineConsent
 from money_manager.ui.theme import Spacing
+from money_manager.core.i18n import tr
 
 
 def _bullets(items: tuple[str, ...]) -> str:
@@ -42,29 +43,28 @@ class DataConsentDialog(QDialog):
         self.warning_label.setObjectName("PrivacyNotice" if disclosure.is_online else "CardBody")
         self.warning_label.setWordWrap(True)
 
-        destination = QLabel(f"Destination: {disclosure.provider} ({disclosure.destination})"
-                             f" · model {disclosure.model}")
+        destination = QLabel(tr("Destination: {0} ({1}) · model {2}", disclosure.provider, disclosure.destination, disclosure.model))
         destination.setObjectName("MutedLabel")
-        included = QLabel("Included:\n" + _bullets(disclosure.included))
+        included = QLabel(tr("Included:\n") + _bullets(disclosure.included))
         included.setObjectName("CardBody")
         included.setWordWrap(True)
-        never = QLabel("Never sent:\n" + _bullets(disclosure.never_sent))
+        never = QLabel(tr("Never sent:\n") + _bullets(disclosure.never_sent))
         never.setObjectName("CardBody")
         never.setWordWrap(True)
 
-        preview_label = QLabel("Exactly what will be sent:")
+        preview_label = QLabel(tr("Exactly what will be sent:"))
         preview_label.setObjectName("FieldLabel")
         self.preview = QPlainTextEdit(disclosure.request.payload_text)
         self.preview.setReadOnly(True)
         self.preview.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
         self.preview.setMinimumHeight(240)
 
-        self.acknowledge = QCheckBox("I understand that this information will leave my computer.")
+        self.acknowledge = QCheckBox(tr("I understand that this information will leave my computer."))
         self.acknowledge.setVisible(disclosure.is_online)
 
         buttons = QDialogButtonBox()
         self.send_button: QPushButton = buttons.addButton(
-            f"Send to {disclosure.provider}" if disclosure.is_online else "Analyse",
+            tr("Send to {0}", disclosure.provider) if disclosure.is_online else tr("Analyse"),
             QDialogButtonBox.ButtonRole.AcceptRole)
         self.send_button.setObjectName("PrimaryButton")
         self.cancel_button = buttons.addButton(QDialogButtonBox.StandardButton.Cancel)

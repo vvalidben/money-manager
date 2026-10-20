@@ -142,10 +142,10 @@ class Database:
         finally:
             session.close()
 
-    def backup(self, label: str) -> Path | None:
+    def backup(self, label: str, moment: datetime | None = None) -> Path | None:
         """Write a consistent copy of the database next to it; None for in-memory."""
         try:
-            return backup_database(self._engine, self.path, label)
+            return backup_database(self._engine, self.path, label, moment)
         except (OSError, sqlite3.Error) as exc:
             raise DatabaseError(f"Could not write a backup of the database: {exc}") from exc
 

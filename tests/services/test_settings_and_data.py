@@ -56,7 +56,8 @@ def services(database: Database, store: MemorySecretStore) -> AppServices:
 
 
 @pytest.fixture
-def everything(services: AppServices, monkeypatch: pytest.MonkeyPatch) -> AppServices:
+def everything(services: AppServices, monkeypatch: pytest.MonkeyPatch,
+               tmp_path_factory: pytest.TempPathFactory) -> AppServices:
     """At least one row in every table, with private text and a stored API key."""
     s = services
     s.settings.set_currency("MAD")
@@ -84,6 +85,12 @@ def everything(services: AppServices, monkeypatch: pytest.MonkeyPatch) -> AppSer
     s.recurring.create("Rent", type="expense", amount="3000", account_id=bank.id,
                        category_id=food.id, frequency="monthly",
                        first_date=date(2026, 7, 5))
+    loan = s.debts.create("Loan to Sami", direction="lent", amount="700",
+                          start_date=date(2026, 6, 2), account_id=bank.id)
+    s.debts.record_payment(loan.id, "100", date(2026, 6, 9), account_id=bank.id)
+    receipt = tmp_path_factory.mktemp("receipt") / "ticket.png"
+    receipt.write_bytes(b"\x89PNG\r\n\x1a\n" + bytes(range(256)))
+    s.receipts.add(s.transactions.list()[0].id, receipt)
     s.goals.create_with_new_allocation("Car", target="50000", deadline=date(2027, 6, 1),
                                        initial_amount="500")
     s.goals.create_manual("Gift", target="800", current="200")
@@ -205,7 +212,7 @@ def test_backup_file_format(everything: AppServices, tmp_path: Path) -> None:
     row = dict(zip(accounts["columns"], accounts["rows"][0], strict=True))
     assert row["opening_balance_minor"] == 1000055  # exact integer minor units
     assert row["opening_date"] == "2026-01-01"
-    assert summary.count("transactions") == 7  # incl. subscription, contribution, transfer
+    assert summary.count("transactions") == 9  # incl. subscription, contribution, transfer, loan
     assert not list(tmp_path.glob("*.tmp"))
 
 
@@ -224,7 +231,7 @@ def test_transactions_csv(everything: AppServices, tmp_path: Path) -> None:
     raw = path.read_bytes()
     assert raw.startswith(b"\xef\xbb\xbf")  # BOM so spreadsheet programs read UTF-8
     rows = list(csv.reader(path.read_text(encoding="utf-8-sig").splitlines()))
-    assert count == 7 and len(rows) == 8
+    assert count == 9 and len(rows) == 10
     assert rows[0] == ["Date", "Type", "Account", "Category", "Allocation", "Amount",
                        "Currency", "Description", "Notes"]
     salary = next(r for r in rows if r[7] == "Salary")
@@ -309,7 +316,7 @@ def test_import_writes_a_safety_backup_first(everything: AppServices, database: 
     assert result.safety_backup is not None and result.safety_backup.is_file()
     assert "before-import" in result.safety_backup.name
     with sqlite3.connect(result.safety_backup) as copy:
-        assert copy.execute("SELECT count(*) FROM transactions").fetchone()[0] == 7
+        assert copy.execute("SELECT count(*) FROM transactions").fetchone()[0] == 9
 
 
 # ------------------------------------------------------------------- reset
@@ -370,3 +377,37 @@ def test_backups_from_an_earlier_schema_with_the_same_tables_import(
 
     assert snapshot(database) == before
 
+
+
+class TestPasswordProtectedBackups:
+    def test_round_trip(self, everything: AppServices, database: Database,
+                        tmp_path: Path) -> None:
+        from money_manager.services.data_service import ENCRYPTED_MAGIC, BackupPasswordNeeded
+
+        before = snapshot(database)
+        path = tmp_path / "backup.mmbackup"
+        everything.data.export_backup(path, password="correct horse")
+        raw = path.read_bytes()
+        assert raw.startswith(ENCRYPTED_MAGIC)
+        assert b"Salary" not in raw and b"HYPERLINK" not in raw  # nothing readable
+        assert everything.data.is_encrypted(path)
+        with pytest.raises(BackupPasswordNeeded):
+            everything.data.read_backup(path)
+        with pytest.raises(ValidationError, match="password is wrong"):
+            everything.data.read_backup(path, "wrong password")
+        everything.data.reset(RESET_CONFIRMATION)
+        everything.data.import_backup(path, "correct horse")
+        assert snapshot(database) == before
+
+    def test_tampering_and_short_passwords(self, everything: AppServices,
+                                           tmp_path: Path) -> None:
+        path = tmp_path / "backup.mmbackup"
+        with pytest.raises(ValidationError, match="at least 8"):
+            everything.data.export_backup(path, password="short")
+        everything.data.export_backup(path, password="long enough")
+        raw = bytearray(path.read_bytes())
+        raw[-5] ^= 0x01
+        path.write_bytes(bytes(raw))
+        with pytest.raises(ValidationError, match="damaged"):
+            everything.data.read_backup(path, "long enough")
+        assert not everything.data.is_encrypted(tmp_path / "missing")

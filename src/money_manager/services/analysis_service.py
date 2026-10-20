@@ -47,6 +47,7 @@ from money_manager.persistence.repositories import (
 )
 from money_manager.services.currency import ensure_single_currency
 from money_manager.services.statistics_service import MAX_RANGE_DAYS
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ class FinancialAnalysisService:
 
         with self._database.session() as session:
             accounts = AccountRepository(session).list_all()
-            ensure_single_currency(accounts, currency, "financial analysis")
+            ensure_single_currency(accounts, currency, tr("financial analysis"))
             tracking_start = min((a.opening_date for a in accounts), default=None)
             months = trend_months(period.end, tracking_start)
             first_month = months[0] if months else month_start(period.start)
@@ -143,11 +144,11 @@ class FinancialAnalysisService:
     @staticmethod
     def _validate(period: DateRange, today: date) -> None:
         if not isinstance(period, DateRange):
-            raise ValidationError("Choose a period.", "period")
+            raise ValidationError(tr("Choose a period."), "period")
         if period.end > today:
-            raise ValidationError("The period cannot end in the future.", "end")
+            raise ValidationError(tr("The period cannot end in the future."), "end")
         if period.start < EARLIEST_ALLOWED_DATE:
             raise ValidationError(
-                f"The period cannot start before {EARLIEST_ALLOWED_DATE.isoformat()}.", "start")
+                tr("The period cannot start before {0}.", EARLIEST_ALLOWED_DATE.isoformat()), "start")
         if period.days > MAX_RANGE_DAYS:
-            raise ValidationError("Choose a period of at most ten years.", "start")
+            raise ValidationError(tr("Choose a period of at most ten years."), "start")

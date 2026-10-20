@@ -9,14 +9,15 @@ from PySide6.QtWidgets import QButtonGroup, QDateEdit, QHBoxLayout, QLabel, QPus
 from money_manager.domain.periods import StatsRange
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import to_qdate
+from money_manager.core.i18n import tr
 
 RANGE_LABELS = {
-    StatsRange.DAYS_7: "7 days",
-    StatsRange.DAYS_30: "30 days",
-    StatsRange.MONTHS_3: "3 months",
-    StatsRange.MONTHS_6: "6 months",
-    StatsRange.YEAR_1: "1 year",
-    StatsRange.CUSTOM: "Custom",
+    StatsRange.DAYS_7: tr("7 days"),
+    StatsRange.DAYS_30: tr("30 days"),
+    StatsRange.MONTHS_3: tr("3 months"),
+    StatsRange.MONTHS_6: tr("6 months"),
+    StatsRange.YEAR_1: tr("1 year"),
+    StatsRange.CUSTOM: tr("Custom"),
 }
 DEFAULT_RANGE = StatsRange.DAYS_30
 

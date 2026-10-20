@@ -36,6 +36,7 @@ from money_manager.ui.formatting import (
     format_signed_money,
     month_abbreviation,
 )
+from money_manager.core.i18n import tr
 
 DONUT_SLICES = len(CATEGORICAL)  # top 5 get a colour; the rest fold into "Other"
 CHANGE_ROWS = 8
@@ -49,7 +50,7 @@ def fold_categories(rows: Sequence[CategoryAmount]) -> list[CategoryAmount]:
     rest = rows[DONUT_SLICES:]
     other = sum_money((row.amount for row in rest), rows[0].amount.currency)
     total = sum_money((row.amount for row in rows), rows[0].amount.currency)
-    return [*rows[:DONUT_SLICES], CategoryAmount(None, "Other", other, ratio(other, total))]
+    return [*rows[:DONUT_SLICES], CategoryAmount(None, tr("Other"), other, ratio(other, total))]
 
 
 def category_colours(rows: Sequence[CategoryAmount], all_category_ids: Sequence[int]) -> list[str]:
@@ -85,7 +86,7 @@ class CategoryShareChart(ChartCanvas):
     def render(self, rows: Sequence[CategoryAmount], all_category_ids: Sequence[int]) -> None:
         slices = fold_categories(rows)
         if not slices:
-            self.show_message("No spending in this period")
+            self.show_message(tr("No spending in this period"))
             return
         self.reset()
         ax = self.axes
@@ -125,7 +126,7 @@ class CategoryChangeChart(ChartCanvas):
     def render(self, rows: Sequence[CategoryChange]) -> None:
         rows = list(rows[:CHANGE_ROWS])
         if not rows:
-            self.show_message("No spending in this or the previous period")
+            self.show_message(tr("No spending in this or the previous period"))
             return
         self.reset()
         ax = self.axes
@@ -144,9 +145,8 @@ class CategoryChangeChart(ChartCanvas):
                                      edgecolors=SURFACE, linewidths=2, zorder=3)
             label = change_label(row)
             ax.text(largest * 1.04, position, label, va="center", ha="left", color=INK_SECONDARY)
-            self.add_hover(previous_dot, f"{row.name}\nPrevious: {format_money(row.previous)}")
-            self.add_hover(current_dot, f"{row.name}\nThis period: {format_money(row.current)}"
-                                        f"\n{label}")
+            self.add_hover(previous_dot, tr("{0}\nPrevious: {1}", row.name, format_money(row.previous)))
+            self.add_hover(current_dot, tr("{0}\nThis period: {1}\n{2}", row.name, format_money(row.current), label))
         ax.set_yticks(positions)
         ax.set_yticklabels([row.name for row in rows])
         ax.set_ylim(-0.7, len(rows) - 0.3)
@@ -155,9 +155,9 @@ class CategoryChangeChart(ChartCanvas):
         ax.legend(
             handles=[
                 Line2D([], [], marker="o", linestyle="", markersize=8, color=PREVIOUS_COLOR,
-                       label="Previous period"),
+                       label=tr("Previous period")),
                 Line2D([], [], marker="o", linestyle="", markersize=8, color=INCOME_COLOR,
-                       label="This period"),
+                       label=tr("This period")),
             ],
             loc="lower left", bbox_to_anchor=(0, 1.0), frameon=False, ncols=2,
             borderaxespad=0.2,
@@ -178,7 +178,7 @@ class SpendingTrendChart(ChartCanvas):
 
     def render(self, trend: SpendingTrend) -> None:
         if not any(bucket.spending.is_positive() for bucket in trend.buckets):
-            self.show_message("No spending in this period")
+            self.show_message(tr("No spending in this period"))
             return
         self.reset()
         ax = self.axes
@@ -215,7 +215,7 @@ def bucket_label(granularity: Granularity, start: date, end: date) -> str:
 
 def category_share_table(rows: Sequence[CategoryAmount]) -> TableData:
     return (
-        ["Category", "Spent", "Share"],
+        [tr("Category"), tr("Spent"), tr("Share")],
         [[r.name, format_money(r.amount), "—" if r.share is None else format_percent(r.share)]
          for r in rows],
     )
@@ -223,7 +223,7 @@ def category_share_table(rows: Sequence[CategoryAmount]) -> TableData:
 
 def category_change_table(rows: Sequence[CategoryChange]) -> TableData:
     return (
-        ["Category", "Previous", "This period", "Change", "%"],
+        [tr("Category"), tr("Previous"), tr("This period"), tr("Change"), "%"],
         [[r.name, format_money(r.previous), format_money(r.current),
           format_signed_money(r.change), change_label(r)] for r in rows],
     )
@@ -231,7 +231,7 @@ def category_change_table(rows: Sequence[CategoryChange]) -> TableData:
 
 def spending_trend_table(trend: SpendingTrend) -> TableData:
     return (
-        ["Period", "Spending"],
+        [tr("Period"), tr("Spending")],
         [[bucket_label(trend.granularity, b.period.start, b.period.end), format_money(b.spending)]
          for b in trend.buckets],
     )

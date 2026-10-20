@@ -20,6 +20,7 @@ from pathlib import Path
 
 from money_manager.core.errors import ConfigurationError
 from money_manager.core.resources import executable_dir
+from money_manager.core.i18n import tr
 
 DATA_DIR_ENV = "MONEY_MANAGER_DATA_DIR"
 LOG_LEVEL_ENV = "MONEY_MANAGER_LOG_LEVEL"
@@ -60,7 +61,7 @@ class AppConfig:
 def default_data_dir(environ: Mapping[str, str]) -> Path:
     """Per-user data folder, e.g. ``%LOCALAPPDATA%\\MoneyManager``."""
     local_app_data = environ.get("LOCALAPPDATA")
-    base = Path(local_app_data) if local_app_data else Path.home() / "AppData" / "Local"
+    base = Path(local_app_data) if local_app_data else Path.home() / "AppData" / tr("Local")
     return base / APP_DIR_NAME
 
 
@@ -71,7 +72,7 @@ def find_config_file(environ: Mapping[str, str]) -> Path | None:
         path = Path(named).expanduser()
         if not path.is_file():
             raise ConfigurationError(
-                f"The configuration file named by {CONFIG_FILE_ENV} does not exist: {path}")
+                tr("The configuration file named by {0} does not exist: {1}", CONFIG_FILE_ENV, path))
         return path
     folder = executable_dir()
     if folder is not None and (folder / CONFIG_FILENAME).is_file():
@@ -87,15 +88,14 @@ def read_config_file(path: Path) -> dict[str, str]:
         with path.open(encoding="utf-8-sig") as handle:
             parser.read_file(handle)
     except (OSError, UnicodeDecodeError, configparser.Error) as exc:
-        raise ConfigurationError(f"Cannot read the configuration file '{path}': {exc}") from exc
+        raise ConfigurationError(tr("Cannot read the configuration file '{0}': {1}", path, exc)) from exc
     if not parser.has_section(CONFIG_SECTION):
         return {}
     values = {key: value.strip() for key, value in parser.items(CONFIG_SECTION)}
     unknown = sorted(set(values) - _KNOWN_KEYS)
     if unknown:
         raise ConfigurationError(
-            f"Unknown setting(s) {', '.join(unknown)} in '{path}'; expected "
-            f"{', '.join(sorted(_KNOWN_KEYS))}.")
+            tr("Unknown setting(s) {0} in '{1}'; expected {2}.", ', '.join(unknown), path, ', '.join(sorted(_KNOWN_KEYS))))
     if values.get("data_dir"):
         data_dir = Path(os.path.expandvars(values["data_dir"])).expanduser()
         values["data_dir"] = str(data_dir if data_dir.is_absolute() else path.parent / data_dir)
@@ -129,5 +129,5 @@ def prepare_directories(config: AppConfig) -> None:
             directory.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise ConfigurationError(
-                f"Cannot create the folder '{directory}': {exc.strerror or exc}"
+                tr("Cannot create the folder '{0}': {1}", directory, exc.strerror or exc)
             ) from exc

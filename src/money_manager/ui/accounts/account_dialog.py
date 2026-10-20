@@ -20,6 +20,7 @@ from money_manager.services import AppServices
 from money_manager.ui.components import FormField
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import to_qdate
+from money_manager.core.i18n import tr
 
 # Like transaction amounts, but an opening balance may be negative (overdrawn).
 OPENING_BALANCE_PATTERN = r"-?[0-9   ]*([.,][0-9]{0,2})?"
@@ -33,21 +34,21 @@ class AccountDialog(QDialog):
         self._original = account
         self.saved: Account | None = None
 
-        self.setWindowTitle("Edit account" if account else "Create account")
+        self.setWindowTitle(tr("Edit account") if account else tr("Create account"))
         self.setModal(True)
         self.setMinimumWidth(420)
 
         intro = QLabel(
-            "An account is where your money is kept, such as a bank account or cash. "
+            tr("An account is where your money is kept, such as a bank account or cash. "
             "Enter its balance on the day you start tracking; earlier activity is "
-            "already included in that balance."
+            "already included in that balance.")
         )
         intro.setObjectName("CardBody")
         intro.setWordWrap(True)
 
         self.name_edit = QLineEdit()
         self.name_edit.setMaxLength(MAX_ACCOUNT_NAME_LENGTH)
-        self.name_edit.setPlaceholderText("e.g. Bank account")
+        self.name_edit.setPlaceholderText(tr("e.g. Bank account"))
 
         self.balance_edit = QLineEdit("0")
         self.balance_edit.setValidator(
@@ -60,11 +61,11 @@ class AccountDialog(QDialog):
         self.date_edit.setMaximumDate(to_qdate(services.today()))
 
         self.fields: dict[str, FormField] = {
-            "name": FormField("Name", self.name_edit),
+            "name": FormField(tr("Name"), self.name_edit),
             "opening_balance": FormField(
-                f"Balance on the start date ({services.base_currency})", self.balance_edit
+                tr("Balance on the start date ({0})", services.base_currency), self.balance_edit
             ),
-            "opening_date": FormField("Start date", self.date_edit),
+            "opening_date": FormField(tr("Start date"), self.date_edit),
         }
         self.form_error = QLabel()
         self.form_error.setObjectName("FormError")
@@ -75,7 +76,7 @@ class AccountDialog(QDialog):
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
         save = buttons.button(QDialogButtonBox.StandardButton.Save)
-        save.setText("Save changes" if account else "Create account")
+        save.setText(tr("Save changes") if account else tr("Create account"))
         save.setObjectName("PrimaryButton")
         buttons.accepted.connect(self.submit)
         buttons.rejected.connect(self.reject)

@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 from money_manager import APP_NAME, __version__
 from money_manager.ui import motion
 from money_manager.ui.theme import Colors, Spacing, page_fill, set_style_property
+from money_manager.core.i18n import tr
 
 RAIL_WIDTH = 84
 EXPANDED_WIDTH = 268
@@ -164,7 +165,7 @@ class Sidebar(QFrame):
         brand_text.setContentsMargins(0, 0, 0, 0)
         brand_text.setSpacing(0)
         brand_text.addWidget(self._label(APP_NAME, "SidebarBrand"))
-        brand_text.addWidget(self._label("Personal finance, kept local", "SidebarTagline"))
+        brand_text.addWidget(self._label(tr("Personal finance, kept local"), "SidebarTagline"))
         brand_row.addWidget(self._brand_text, 1)
         layout.addLayout(brand_row)
         layout.addSpacing(14)
@@ -280,7 +281,7 @@ class Sidebar(QFrame):
 
     def _create_button(self, item: NavItem) -> QPushButton:
         if item.key in self._buttons:
-            raise ValueError(f"Duplicate navigation key: {item.key!r}")
+            raise ValueError(tr("Duplicate navigation key: {0!r}", item.key))
 
         button = QPushButton(item.label)
         button.setObjectName("NavButton")
@@ -307,10 +308,10 @@ class Sidebar(QFrame):
         row.setSpacing(Spacing.SM)
         dot = QLabel()
         dot.setPixmap(dot_pixmap(Colors.MINT))
-        dot.setToolTip(f"Offline · stored on this computer · version {__version__}")
+        dot.setToolTip(tr("Offline · stored on this computer · version {0}", __version__))
         row.addWidget(dot)
-        self._status_label = self._label("Offline · stored on this PC", "SidebarFooter")
-        self._status_label.setToolTip(f"Version {__version__}")
+        self._status_label = self._label(tr("Offline · stored on this PC"), "SidebarFooter")
+        self._status_label.setToolTip(tr("Version {0}", __version__))
         row.addWidget(self._status_label, 1)
         return row
 

@@ -28,9 +28,10 @@ from money_manager.ui.components import FormField
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import to_qdate
 from money_manager.ui.transactions.transaction_dialog import AMOUNT_INPUT_PATTERN, side_by_side
+from money_manager.core.i18n import tr
 
-FREQUENCY_LABELS = {Frequency.WEEKLY: "Every week", Frequency.MONTHLY: "Every month",
-                    Frequency.QUARTERLY: "Every 3 months", Frequency.YEARLY: "Every year"}
+FREQUENCY_LABELS = {Frequency.WEEKLY: tr("Every week"), Frequency.MONTHLY: tr("Every month"),
+                    Frequency.QUARTERLY: tr("Every 3 months"), Frequency.YEARLY: tr("Every year")}
 
 
 class RecurringEntryDialog(QDialog):
@@ -40,16 +41,16 @@ class RecurringEntryDialog(QDialog):
         self._services = services
         self._original = entry
         self.saved: RecurringEntry | None = None
-        self.setWindowTitle("Edit recurring entry" if entry else "New recurring entry")
+        self.setWindowTitle(tr("Edit recurring entry") if entry else tr("New recurring entry"))
         self.setModal(True)
         self.setMinimumWidth(500)
 
         self.type_combo = QComboBox()
-        self.type_combo.addItem("Expense", TransactionType.EXPENSE.value)
-        self.type_combo.addItem("Income", TransactionType.INCOME.value)
+        self.type_combo.addItem(tr("Expense"), TransactionType.EXPENSE.value)
+        self.type_combo.addItem(tr("Income"), TransactionType.INCOME.value)
         self.description_edit = QLineEdit()
         self.description_edit.setMaxLength(MAX_DESCRIPTION_LENGTH)
-        self.description_edit.setPlaceholderText("e.g. Rent, Salary")
+        self.description_edit.setPlaceholderText(tr("e.g. Rent, Salary"))
         self.amount_edit = QLineEdit()
         self.amount_edit.setPlaceholderText("0.00")
         self.amount_edit.setValidator(
@@ -70,18 +71,18 @@ class RecurringEntryDialog(QDialog):
         self.date_edit.setDate(to_qdate(services.today()))
 
         self.fields: dict[str, FormField] = {
-            "type": FormField("Type", self.type_combo),
-            "description": FormField("Description", self.description_edit),
-            "amount": FormField("Amount", side_by_side(self.amount_edit, currency),
+            "type": FormField(tr("Type"), self.type_combo),
+            "description": FormField(tr("Description"), self.description_edit),
+            "amount": FormField(tr("Amount"), side_by_side(self.amount_edit, currency),
                                 highlight=self.amount_edit),
-            "account_id": FormField("Account", self.account_combo),
-            "category_id": FormField("Category", self.category_combo),
-            "frequency": FormField("Repeats", self.frequency_combo),
-            "first_date": FormField("Next date" if entry else "First date", self.date_edit),
+            "account_id": FormField(tr("Account"), self.account_combo),
+            "category_id": FormField(tr("Category"), self.category_combo),
+            "frequency": FormField(tr("Repeats"), self.frequency_combo),
+            "first_date": FormField(tr("Next date") if entry else tr("First date"), self.date_edit),
         }
-        note = QLabel("Recorded automatically on each date — when Money Manager is open, or the "
+        note = QLabel(tr("Recorded automatically on each date — when Money Manager is open, or the "
                       "next time it starts. A first date in the past records the dates since "
-                      "then (up to a year).")
+                      "then (up to a year)."))
         note.setObjectName("MutedLabel")
         note.setWordWrap(True)
         self.form_error = QLabel()
@@ -149,7 +150,7 @@ class RecurringEntryDialog(QDialog):
         index = self.category_combo.findData(keep)
         self.category_combo.setCurrentIndex(index if index >= 0 else 0)
         self.category_combo.setPlaceholderText(
-            "No category yet — add one first" if self.category_combo.count() == 0 else "")
+            tr("No category yet — add one first") if self.category_combo.count() == 0 else "")
 
     def submit(self) -> bool:
         for field in self.fields.values():

@@ -37,6 +37,7 @@ from money_manager.domain.periods import (
     same_days_previous_month,
 )
 from money_manager.domain.validation import normalize_name
+from money_manager.core.i18n import tr
 
 # --------------------------------------------------------------------- inputs
 
@@ -547,4 +548,4 @@ def _median(values: Sequence[int]) -> Decimal:
 
 
 def _name(names: Mapping[int, str], category_id: int | None) -> str:
-    return "Uncategorised" if category_id is None else names.get(category_id, "?")
+    return tr("Uncategorised") if category_id is None else names.get(category_id, "?")

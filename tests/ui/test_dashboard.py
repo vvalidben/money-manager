@@ -279,8 +279,8 @@ class TestPage:
             "Balance: 29,620.00 MAD\nInvestments: 5,000.00 MAD")
         page.net_worth_card.toggle_button.click()
         table = page.net_worth_card.table
-        assert [table.item(5, c).text() for c in range(4)] == [
-            "Jun 2026", "34,200.00 MAD", "5,000.00 MAD", "39,200.00 MAD"]
+        assert [table.item(5, c).text() for c in range(5)] == [
+            "Jun 2026", "34,200.00 MAD", "5,000.00 MAD", "0.00 MAD", "39,200.00 MAD"]
 
     def test_table_toggle(self, page: DashboardPage, populated: None) -> None:
         page.on_shown()

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QWidget
 
 from money_manager import APP_NAME
 from money_manager.ui.theme import FONT_FAMILY, MONO_FONT_FAMILY, Colors
+from money_manager.core.i18n import tr
 
 INTRO_MS = 1100
 FADE_MS = 300
@@ -40,7 +41,7 @@ class LaunchScreen(QWidget):
         self.setFixedSize(380, 300)
         self.setWindowTitle(APP_NAME)
         self._progress = 0.0
-        self._status = "Opening your data"
+        self._status = tr("Opening your data")
         self._intro = QPropertyAnimation(self, b"progress", self)
         self._intro.setDuration(INTRO_MS)
         self._intro.setStartValue(0.0)
@@ -59,7 +60,7 @@ class LaunchScreen(QWidget):
             self.move(screen.availableGeometry().center() - self.rect().center())
         self.show()
         self._intro.start()
-        QTimer.singleShot(INTRO_MS * 2 // 3, self, lambda: self._set_status("Ready"))
+        QTimer.singleShot(INTRO_MS * 2 // 3, self, lambda: self._set_status(tr("Ready")))
 
     def fade_out(self) -> None:
         self._fade.start()

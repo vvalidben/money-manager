@@ -16,14 +16,15 @@ from money_manager.ui.ai.background import BackgroundCall, run_in_background
 from money_manager.ui.components.card import Card
 from money_manager.ui.lock import hello
 from money_manager.ui.lock.hello import HelloResult, HelloStatus
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
 
 def lock_after_label(minutes: int) -> str:
     if minutes == 0:
-        return "Only when I lock it"
-    return "After 1 minute without use" if minutes == 1 else f"After {minutes} minutes without use"
+        return tr("Only when I lock it")
+    return tr("After 1 minute without use") if minutes == 1 else tr("After {0} minutes without use", minutes)
 
 
 class AppLockCard(Card):
@@ -31,24 +32,24 @@ class AppLockCard(Card):
     lock_requested = Signal()
 
     def __init__(self, services: AppServices, parent: QWidget | None = None) -> None:
-        super().__init__("App lock", parent)
+        super().__init__(tr("App lock"), parent)
         self._settings = services.settings
         self._call: BackgroundCall | None = None
         self.status: HelloStatus | None = None
-        intro = QLabel("Ask for Windows Hello (PIN, fingerprint or face) when Money Manager "
+        intro = QLabel(tr("Ask for Windows Hello (PIN, fingerprint or face) when Money Manager "
                        "opens and after a while without use. This keeps other people who use "
-                       "your computer out of the app; it does not encrypt the data file.")
+                       "your computer out of the app; it does not encrypt the data file."))
         intro.setObjectName("CardBody")
         intro.setWordWrap(True)
-        self.lock_box = QCheckBox("Lock Money Manager with Windows Hello")
-        self.lock_box.setAccessibleName("Lock with Windows Hello")
+        self.lock_box = QCheckBox(tr("Lock Money Manager with Windows Hello"))
+        self.lock_box.setAccessibleName(tr("Lock with Windows Hello"))
         self.lock_box.toggled.connect(self._toggled)
         self.after_combo = QComboBox()
-        self.after_combo.setAccessibleName("When to lock")
+        self.after_combo.setAccessibleName(tr("When to lock"))
         for minutes in LOCK_AFTER_CHOICES:
             self.after_combo.addItem(lock_after_label(minutes), minutes)
         self.after_combo.currentIndexChanged.connect(self._after_changed)
-        self.lock_now_button = QPushButton("Lock now")
+        self.lock_now_button = QPushButton(tr("Lock now"))
         self.lock_now_button.setToolTip("Ctrl+L")
         self.lock_now_button.clicked.connect(self.lock_requested)
         row = QHBoxLayout()
@@ -93,8 +94,8 @@ class AppLockCard(Card):
         self.lock_box.blockSignals(True)
         self.lock_box.setChecked(not wanted)
         self.lock_box.blockSignals(False)
-        self.status_label.setText("Confirm with Windows Hello…")
-        message = "Turn on the Money Manager lock" if wanted else "Turn off the Money Manager lock"
+        self.status_label.setText(tr("Confirm with Windows Hello…"))
+        message = tr("Turn on the Money Manager lock") if wanted else tr("Turn off the Money Manager lock")
         verifier = hello.default_verifier()
         self._call = run_in_background(lambda: verifier.verify(message),
                                        lambda result: self._answered(wanted, result),
@@ -104,7 +105,7 @@ class AppLockCard(Card):
     def _answered(self, wanted: bool, result: HelloResult) -> None:
         if result is not HelloResult.VERIFIED:
             self.status_label.setText(
-                "Not changed: Windows Hello did not confirm it's you." if result is not
+                tr("Not changed: Windows Hello did not confirm it's you.") if result is not
                 HelloResult.UNAVAILABLE else (self.status or HelloStatus.UNSUPPORTED).explanation)
             self._update(not wanted)
             return
@@ -117,13 +118,13 @@ class AppLockCard(Card):
         self.lock_box.blockSignals(True)
         self.lock_box.setChecked(wanted)
         self.lock_box.blockSignals(False)
-        self.status_label.setText("The lock is on." if wanted else "The lock is off.")
+        self.status_label.setText(tr("The lock is on.") if wanted else tr("The lock is off."))
         self._update(wanted)
         self.changed.emit()
 
     def _failed(self, error: BaseException) -> None:
         logger.warning("Windows Hello check failed: %s", type(error).__name__)
-        self.status_label.setText("Not changed: Windows Hello did not answer.")
+        self.status_label.setText(tr("Not changed: Windows Hello did not answer."))
         self._update(self.lock_box.isChecked())
 
     def _after_changed(self, _index: int) -> None:

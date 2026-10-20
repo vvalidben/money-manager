@@ -12,6 +12,13 @@ and value types). The current database is copied to a safety backup, then all
 rows are replaced in *one* transaction, and foreign keys are checked before
 committing; any failure rolls everything back, so data is never half-imported.
 
+**Password protection** (optional): the same JSON, encrypted with AES-256-GCM
+under a key derived from the password with scrypt (random salt and nonce per
+file). The file starts with ``ENCRYPTED_MAGIC``; importing it asks for the
+password. A wrong password or a changed byte is detected (GCM tag), never
+half-read. The password is not stored anywhere — a forgotten password cannot
+be recovered.
+
 **Transactions CSV** is a read-only export for spreadsheets.
 
 **Reset** deletes all data only when the caller passes the exact
@@ -25,6 +32,8 @@ data, in one transaction); a copy from an older version is upgraded first, in
 a temporary folder, so the copy itself is never changed.
 """
 
+import base64
+import binascii
 import csv
 import hashlib
 import json
@@ -40,6 +49,8 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from sqlalchemy import Table, delete, insert, select, text
 from sqlalchemy.orm import aliased
 
@@ -59,13 +70,18 @@ from money_manager.persistence.models import (
     TransactionModel,
 )
 from money_manager.services.allocation_service import ConsistencyReport
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
 BACKUP_FORMAT = "money-manager-backup"
 BACKUP_FORMAT_VERSION = 1
-MAX_BACKUP_BYTES = 200 * 1024 * 1024
+MAX_BACKUP_BYTES = 1024 * 1024 * 1024  # receipts make backups larger
 RESET_CONFIRMATION = "RESET"
+ENCRYPTED_MAGIC = b"MONEY-MANAGER-BACKUP AES-256-GCM v1\n"
+MIN_BACKUP_PASSWORD = 8
+_SALT_BYTES, _NONCE_BYTES = 16, 12
+_SCRYPT = {"n": 2**15, "r": 8, "p": 1, "maxmem": 64 * 1024 * 1024, "dklen": 32}
 # Internal bookkeeping about the database file itself (creation date, etc.).
 EXCLUDED_TABLES = frozenset({"app_metadata"})
 SAFETY_REASONS = {
@@ -125,7 +141,7 @@ class SafetyCopy:
 
     @property
     def reason_text(self) -> str:
-        return SAFETY_REASONS.get(self.reason, "Before an update of Money Manager")
+        return tr(SAFETY_REASONS.get(self.reason, "Before an update of Money Manager"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,9 +160,14 @@ class DataService:
 
     # ---------------------------------------------------------------- export
 
-    def export_backup(self, path: Path) -> BackupSummary:
-        """Write every table to ``path`` atomically, then read it back to verify."""
+    def export_backup(self, path: Path, password: str | None = None) -> BackupSummary:
+        """Write every table to ``path`` atomically, then read it back to verify.
+
+        With ``password`` the file is encrypted (see the module notes)."""
         path = _path(path)
+        if password is not None and len(password) < MIN_BACKUP_PASSWORD:
+            raise ValidationError(
+                tr("Use a password of at least {0} characters.", MIN_BACKUP_PASSWORD), "password")
         tables: dict[str, dict[str, Any]] = {}
         with self._database.session() as session:
             for table in data_tables():
@@ -167,11 +188,12 @@ class DataService:
             "checksum": _checksum(tables),
             "tables": tables,
         }
-        _write_atomically(path, json.dumps(document, ensure_ascii=False, indent=1))
-        summary = self.read_backup(path)
+        content = json.dumps(document, ensure_ascii=False, indent=1).encode("utf-8")
+        _write_atomically(path, content if password is None else _encrypt(content, password))
+        summary = self.read_backup(path, password)
         expected = {name: len(content["rows"]) for name, content in tables.items()}
         if dict(summary.counts) != expected:
-            raise DatabaseError("The backup could not be verified after writing it.")
+            raise DatabaseError(tr("The backup could not be verified after writing it."))
         logger.info("Exported a backup with %d rows", summary.total_rows)
         return summary
 
@@ -187,10 +209,10 @@ class DataService:
             rows = session.execute(stmt).all()
             transfer_sides = {}
             for model in session.scalars(select(AccountTransferModel)):
-                transfer_sides[model.out_transaction_id] = "Transfer out"
-                transfer_sides[model.in_transaction_id] = "Transfer in"
-        lines: list[list[str]] = [["Date", "Type", "Account", "Category", "Allocation",
-                                   "Amount", "Currency", "Description", "Notes"]]
+                transfer_sides[model.out_transaction_id] = tr("Transfer out")
+                transfer_sides[model.in_transaction_id] = tr("Transfer in")
+        lines: list[list[str]] = [[tr("Date"), tr("Type"), tr("Account"), tr("Category"), tr("Allocation"),
+                                   tr("Amount"), tr("Currency"), tr("Description"), tr("Notes")]]
         for model, account, category, allocation_name in rows:
             kind = TransactionType(model.type)
             amount = Money.from_minor_units(model.amount_minor * kind.sign, model.currency)
@@ -207,17 +229,26 @@ class DataService:
             os.replace(temporary, target)
         except OSError as exc:
             temporary.unlink(missing_ok=True)
-            raise ValidationError(f"Could not write the file: {exc.strerror or exc}",
+            raise ValidationError(tr("Could not write the file: {0}", exc.strerror or exc),
                                   "path") from exc
         logger.info("Exported %d transactions to CSV", len(rows))
         return len(rows)
 
     # ---------------------------------------------------------------- import
 
-    def read_backup(self, path: Path) -> BackupSummary:
+    @staticmethod
+    def is_encrypted(path: Path) -> bool:
+        """Whether the backup file is password-protected."""
+        try:
+            with _path(path).open("rb") as handle:
+                return handle.read(len(ENCRYPTED_MAGIC)) == ENCRYPTED_MAGIC
+        except OSError:
+            return False
+
+    def read_backup(self, path: Path, password: str | None = None) -> BackupSummary:
         """Validate a backup file completely without changing anything."""
         path = _path(path)
-        document = _load_document(path)
+        document = _load_document(path, password)
         tables = document["tables"]
         return BackupSummary(
             path=path,
@@ -229,14 +260,14 @@ class DataService:
             counts={name: len(content["rows"]) for name, content in tables.items()},
         )
 
-    def import_backup(self, path: Path) -> ImportResult:
+    def import_backup(self, path: Path, password: str | None = None) -> ImportResult:
         """Replace all data with the backup (after a safety copy); all or nothing."""
         path = _path(path)
-        document = _load_document(path)
-        summary = self.read_backup(path)
+        document = _load_document(path, password)
+        summary = self.read_backup(path, password)
         converted = {table.name: _rows_for(table, document["tables"][table.name])
                      for table in data_tables()}
-        safety = self._replace_all(converted, "before-import", "backup", "imported")
+        safety = self._replace_all(converted, "before-import", tr("backup"), tr("imported"))
         logger.info("Imported a backup with %d rows", summary.total_rows)
         report = self._check_consistency() if self._check_consistency is not None else None
         return ImportResult(summary, safety, report)
@@ -255,11 +286,10 @@ class DataService:
                         session.execute(insert(table), rows)
                 violations = session.execute(text("PRAGMA foreign_key_check")).fetchall()
                 if violations:
-                    raise ValidationError(f"The {source}'s records do not fit together (broken "
-                                          f"references). Nothing was {verb}.")
+                    raise ValidationError(tr("The {0}'s records do not fit together (broken references). Nothing was "
+                                             "{1}.", source, verb))
         except DatabaseError as exc:
-            raise ValidationError(f"The {source} could not be {verb}; your data was not "
-                                  "changed.") from exc
+            raise ValidationError(tr("The {0} could not be {1}; your data was not changed.", source, verb)) from exc
         return safety
 
     # --------------------------------------------------------- safety copies
@@ -288,9 +318,9 @@ class DataService:
         known = {copy.path.resolve(): copy for copy in self.safety_copies()}
         copy = known.get(path.resolve())
         if copy is None:
-            raise ValidationError("Choose one of the safety copies listed.", "path")
+            raise ValidationError(tr("Choose one of the safety copies listed."), "path")
         converted, revision = _read_copy(copy.path)
-        safety = self._replace_all(converted, "before-restore", "safety copy", "restored")
+        safety = self._replace_all(converted, "before-restore", tr("safety copy"), tr("restored"))
         counts = {name: len(rows) for name, rows in converted.items()}
         summary = BackupSummary(path=copy.path, exported_at=copy.created_at.isoformat(),
                                 app_version="", schema_revision=revision,
@@ -304,7 +334,7 @@ class DataService:
     def reset(self, confirmation: str, *, remove_api_key: bool = False) -> ResetResult:
         """Delete all data. Requires ``confirmation`` to be exactly ``RESET``."""
         if confirmation != RESET_CONFIRMATION:
-            raise ValidationError(f"Type {RESET_CONFIRMATION} to confirm.", "confirmation")
+            raise ValidationError(tr("Type {0} to confirm.", RESET_CONFIRMATION), "confirmation")
         safety = self._database.backup("before-reset")
         with self._database.session() as session:
             for table in reversed(data_tables()):
@@ -338,7 +368,7 @@ def ensure_daily_copy(database: Database, keep: int = DAILY_COPIES_KEPT,
         has_data = session.execute(select(AccountModel.id).limit(1)).first() is not None
     if not has_data:
         return None
-    copy = database.backup(DAILY_REASON)
+    copy = database.backup(DAILY_REASON, moment)  # named by the same clock
     for _created, old in _daily_copies(database_path)[keep:]:
         try:
             old.unlink()
@@ -393,9 +423,9 @@ def _read_copy(path: Path) -> tuple[dict[str, list[dict[str, Any]]], str]:
             finally:
                 check.close()
         except (OSError, sqlite3.Error) as exc:
-            raise ValidationError("This safety copy cannot be read.", "path") from exc
+            raise ValidationError(tr("This safety copy cannot be read."), "path") from exc
         if status != "ok":
-            raise ValidationError("This safety copy is damaged and cannot be restored.", "path")
+            raise ValidationError(tr("This safety copy is damaged and cannot be restored."), "path")
         database = Database(f"sqlite:///{working.as_posix()}")
         try:
             database.initialize()  # upgrades an older copy; refuses a newer one
@@ -405,7 +435,7 @@ def _read_copy(path: Path) -> tuple[dict[str, list[dict[str, Any]]], str]:
                     select(table).order_by(*table.primary_key.columns))]
                     for table in data_tables()}
         except MoneyManagerError as exc:
-            raise ValidationError(f"This safety copy cannot be restored: {exc}", "path") from exc
+            raise ValidationError(tr("This safety copy cannot be restored: {0}", exc), "path") from exc
         finally:
             database.dispose()
     return converted, revision
@@ -416,17 +446,19 @@ def _path(value: object) -> Path:
         return Path(value)
     if isinstance(value, os.PathLike) and not isinstance(value, bool):
         return Path(value)
-    raise ValidationError("Choose a file.", "path")
+    raise ValidationError(tr("Choose a file."), "path")
 
 
 def _dump(value: Any) -> Any:
     if value is None or isinstance(value, (bool, int, str)):
         return value
+    if isinstance(value, bytes):  # receipts: base64 text in the JSON file
+        return base64.b64encode(value).decode("ascii")
     if isinstance(value, datetime):
         return value.isoformat()
     if isinstance(value, date):
         return value.isoformat()
-    raise TypeError(f"Unsupported value type {type(value).__name__}")
+    raise TypeError(tr("Unsupported value type {0}", type(value).__name__))
 
 
 def _checksum(tables: Mapping[str, Any]) -> str:
@@ -453,14 +485,34 @@ def _currency_of(tables: Mapping[str, Any]) -> str | None:
     return None
 
 
-def _write_atomically(path: Path, content: str) -> None:
+def _encrypt(content: bytes, password: str) -> bytes:
+    salt, nonce = os.urandom(_SALT_BYTES), os.urandom(_NONCE_BYTES)
+    key = hashlib.scrypt(password.encode("utf-8"), salt=salt, **_SCRYPT)
+    return ENCRYPTED_MAGIC + salt + nonce + AESGCM(key).encrypt(nonce, content, ENCRYPTED_MAGIC)
+
+
+def _decrypt(blob: bytes, password: str) -> bytes:
+    body = blob[len(ENCRYPTED_MAGIC):]
+    salt, nonce = body[:_SALT_BYTES], body[_SALT_BYTES:_SALT_BYTES + _NONCE_BYTES]
+    key = hashlib.scrypt(password.encode("utf-8"), salt=salt, **_SCRYPT)
+    try:
+        return AESGCM(key).decrypt(nonce, body[_SALT_BYTES + _NONCE_BYTES:], ENCRYPTED_MAGIC)
+    except (InvalidTag, ValueError) as exc:
+        raise ValidationError(tr("The password is wrong, or the file is damaged."),
+                              "password") from exc
+
+
+def _write_atomically(path: Path, content: str | bytes) -> None:
     temporary = path.with_name(path.name + ".tmp")
     try:
-        temporary.write_text(content, encoding="utf-8")
+        if isinstance(content, bytes):
+            temporary.write_bytes(content)
+        else:
+            temporary.write_text(content, encoding="utf-8")
         os.replace(temporary, path)
     except OSError as exc:
         temporary.unlink(missing_ok=True)
-        raise ValidationError(f"Could not write the file: {exc.strerror or exc}", "path") from exc
+        raise ValidationError(tr("Could not write the file: {0}", exc.strerror or exc), "path") from exc
 
 
 def _cell(value: str) -> str:
@@ -468,43 +520,53 @@ def _cell(value: str) -> str:
     return "'" + value if value.startswith(_FORMULA_PREFIXES) else value
 
 
+class BackupPasswordNeeded(ValidationError):
+    """The backup is encrypted: ask for its password, then try again."""
+
+
 def _invalid(detail: str) -> ValidationError:
-    return ValidationError(f"This is not a valid Money Manager backup: {detail}", "path")
+    return ValidationError(tr("This is not a valid Money Manager backup: {0}", detail), "path")
 
 
-def _load_document(path: Path) -> dict[str, Any]:
+def _load_document(path: Path, password: str | None = None) -> dict[str, Any]:
     try:
         if path.stat().st_size > MAX_BACKUP_BYTES:
-            raise _invalid("the file is too large.")
-        document = json.loads(path.read_text(encoding="utf-8"))
+            raise _invalid(tr("the file is too large."))
+        raw = path.read_bytes()
+        if raw.startswith(ENCRYPTED_MAGIC):
+            if not password:
+                raise BackupPasswordNeeded(tr("This backup is protected by a password."),
+                                           "password")
+            raw = _decrypt(raw, password)
+        document = json.loads(raw.decode("utf-8"))
     except OSError as exc:
-        raise ValidationError(f"Could not read the file: {exc.strerror or exc}", "path") from exc
+        raise ValidationError(tr("Could not read the file: {0}", exc.strerror or exc), "path") from exc
     except (ValueError, UnicodeDecodeError) as exc:
-        raise _invalid("the file is not readable JSON.") from exc
+        raise _invalid(tr("the file is not readable JSON.")) from exc
     if not isinstance(document, dict) or document.get("format") != BACKUP_FORMAT:
-        raise _invalid("the file was not exported by Money Manager.")
+        raise _invalid(tr("the file was not exported by Money Manager."))
     if document.get("format_version") != BACKUP_FORMAT_VERSION:
-        raise _invalid("the backup format version is not supported.")
+        raise _invalid(tr("the backup format version is not supported."))
     # Any known schema whose tables and columns match (checked below) can be
     # imported; revisions that only add indexes do not change the data.
     if document.get("schema_revision") not in known_revisions():
         raise ValidationError(
-            "This backup was made with a newer version of Money Manager (data schema "
-            f"{document.get('schema_revision')}). Update Money Manager to import it.", "path")
+            tr("This backup was made with a newer version of Money Manager (data schema "
+               "{0}). Update Money Manager to import it.", document.get('schema_revision')), "path")
     tables = document.get("tables")
     if not isinstance(tables, dict):
-        raise _invalid("it contains no tables.")
+        raise _invalid(tr("it contains no tables."))
     expected = {t.name for t in data_tables()}
     if set(tables) != expected:
-        raise _invalid("its tables do not match this version of Money Manager.")
+        raise _invalid(tr("its tables do not match this version of Money Manager."))
     if document.get("checksum") != _checksum(tables):
-        raise _invalid("the file is damaged or was edited (checksum mismatch).")
+        raise _invalid(tr("the file is damaged or was edited (checksum mismatch)."))
     for table in data_tables():
         content = tables[table.name]
         if (not isinstance(content, dict) or not isinstance(content.get("rows"), list)
                 or not isinstance(content.get("columns"), list)
                 or sorted(content["columns"]) != sorted(c.name for c in table.columns)):
-            raise _invalid(f"the table '{table.name}' does not have the expected columns.")
+            raise _invalid(tr("the table '{0}' does not have the expected columns.", table.name))
     return document
 
 
@@ -513,7 +575,7 @@ def _rows_for(table: Table, content: Mapping[str, Any]) -> list[dict[str, Any]]:
     rows = []
     for raw in content["rows"]:
         if not isinstance(raw, list) or len(raw) != len(columns):
-            raise _invalid(f"a row in '{table.name}' is malformed.")
+            raise _invalid(tr("a row in '{0}' is malformed.", table.name))
         rows.append({name: _load(table, name, value) for name, value in zip(columns, raw,
                                                                             strict=True)})
     return rows
@@ -523,7 +585,7 @@ def _load(table: Table, name: str, value: Any) -> Any:
     column = table.columns[name]
     if value is None:
         if not column.nullable:
-            raise _invalid(f"'{table.name}.{name}' is missing a value.")
+            raise _invalid(tr("'{0}.{1}' is missing a value.", table.name, name))
         return None
     expected = column.type.python_type
     try:
@@ -537,6 +599,8 @@ def _load(table: Table, name: str, value: Any) -> Any:
             return datetime.fromisoformat(value)
         if expected is date and isinstance(value, str):
             return date.fromisoformat(value)
-    except ValueError:
+        if expected is bytes and isinstance(value, str):
+            return base64.b64decode(value.encode("ascii"), validate=True)
+    except (ValueError, binascii.Error):
         pass
-    raise _invalid(f"'{table.name}.{name}' has a value of the wrong type.")
+    raise _invalid(tr("'{0}.{1}' has a value of the wrong type.", table.name, name))

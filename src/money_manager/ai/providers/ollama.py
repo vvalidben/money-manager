@@ -22,6 +22,7 @@ from money_manager.core.errors import (
     AIUnavailableError,
     ValidationError,
 )
+from money_manager.core.i18n import tr
 
 MAX_ERROR_BODY = 2000
 
@@ -70,11 +71,11 @@ class OllamaProvider(LocalAIProvider):
             if isinstance(exc.reason, (TimeoutError, socket.timeout)):
                 raise self._timeout_error() from exc
             raise AIUnavailableError(
-                f"Ollama is not running at {self._base_url}. Start Ollama and try again."
+                tr("Ollama is not running at {0}. Start Ollama and try again.", self._base_url)
             ) from exc
 
     def _timeout_error(self) -> AITimeoutError:
-        return AITimeoutError(f"Ollama did not answer within {self._timeout} seconds.")
+        return AITimeoutError(tr("Ollama did not answer within {0} seconds.", self._timeout))
 
     def _http_error(self, exc: urllib.error.HTTPError) -> Exception:
         try:
@@ -83,10 +84,9 @@ class OllamaProvider(LocalAIProvider):
             detail = ""
         if exc.code == 404:
             return AIUnavailableError(
-                f"The model '{self.model}' is not installed in Ollama. "
-                f"Run 'ollama pull {self.model}' first.")
+                tr("The model '{0}' is not installed in Ollama. Run 'ollama pull {1}' first.", self.model, self.model))
         suffix = f": {detail}" if isinstance(detail, str) and detail else ""
-        return AIResponseError(f"Ollama returned an error (HTTP {exc.code}){suffix}.")
+        return AIResponseError(tr("Ollama returned an error (HTTP {0}){1}.", exc.code, suffix))
 
     def installed_models(self) -> tuple[str, ...]:
         """Models installed locally; cloud models are left out."""
@@ -94,7 +94,7 @@ class OllamaProvider(LocalAIProvider):
             try:
                 payload = json.load(response)
             except ValueError as exc:
-                raise AIResponseError("Ollama sent an unreadable model list.") from exc
+                raise AIResponseError(tr("Ollama sent an unreadable model list.")) from exc
         entries = payload.get("models", []) if isinstance(payload, dict) else []
         return tuple(sorted(
             str(entry["name"]) for entry in entries
@@ -112,21 +112,20 @@ class OllamaProvider(LocalAIProvider):
             return ProviderStatus(False, "Ollama is running but no local model is installed. "
                                          "Install one with 'ollama pull <model>'.")
         if not self.model:
-            return ProviderStatus(False, "Choose one of the installed models.", models)
+            return ProviderStatus(False, tr("Choose one of the installed models."), models)
         if is_cloud_model(self.model):
-            return ProviderStatus(False, "This model runs on Ollama's servers, not on this "
-                                         "computer. Choose a local model.", models)
+            return ProviderStatus(False, tr("This model runs on Ollama's servers, not on this "
+                                         "computer. Choose a local model."), models)
         if not any(_same_model(self.model, installed) for installed in models):
-            return ProviderStatus(False, f"The model '{self.model}' is not installed. "
-                                         f"Run 'ollama pull {self.model}'.", models)
-        return ProviderStatus(True, f"Ready: {self.model} on this computer.", models)
+            return ProviderStatus(False, tr("The model '{0}' is not installed. Run 'ollama pull {1}'.", self.model, self.model), models)
+        return ProviderStatus(True, tr("Ready: {0} on this computer.", self.model), models)
 
     def _complete(self, request: AIRequest) -> AIResponse:
         if not self.model:
-            raise AIUnavailableError("Choose a local model in the settings first.")
+            raise AIUnavailableError(tr("Choose a local model in the settings first."))
         if is_cloud_model(self.model):
-            raise AIUnavailableError("This model runs on Ollama's servers, not on this "
-                                     "computer. Choose a local model.")
+            raise AIUnavailableError(tr("This model runs on Ollama's servers, not on this "
+                                     "computer. Choose a local model."))
         body = {
             "model": self.model,
             "messages": [{"role": "system", "content": request.system},
@@ -139,7 +138,7 @@ class OllamaProvider(LocalAIProvider):
         with self._open("/api/chat", body) as response:
             for chunk in self._chunks(response):
                 if "error" in chunk:
-                    raise AIResponseError(f"Ollama returned an error: {chunk['error']}")
+                    raise AIResponseError(tr("Ollama returned an error: {0}", chunk['error']))
                 message = chunk.get("message")
                 if isinstance(message, dict) and isinstance(message.get("content"), str):
                     parts.append(message["content"])
@@ -147,10 +146,10 @@ class OllamaProvider(LocalAIProvider):
                     truncated = chunk.get("done_reason") == "length"
                     break
             else:
-                raise AIResponseError("Ollama stopped before finishing the answer.")
+                raise AIResponseError(tr("Ollama stopped before finishing the answer."))
         text = "".join(parts).strip()
         if not text:
-            raise AIResponseError("Ollama returned an empty answer.")
+            raise AIResponseError(tr("Ollama returned an empty answer."))
         return AIResponse(text=text, provider=self.name, model=self.model, truncated=truncated)
 
     def _chunks(self, response: Any) -> Iterator[dict[str, Any]]:
@@ -162,7 +161,7 @@ class OllamaProvider(LocalAIProvider):
                 try:
                     chunk = json.loads(line)
                 except ValueError as exc:
-                    raise AIResponseError("Ollama sent an unreadable answer.") from exc
+                    raise AIResponseError(tr("Ollama sent an unreadable answer.")) from exc
                 if isinstance(chunk, dict):
                     yield chunk
         except (TimeoutError, socket.timeout) as exc:

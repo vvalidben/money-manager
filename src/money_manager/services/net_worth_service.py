@@ -9,12 +9,14 @@ count as nothing, the same rule as the Investments page's net worth.
 from collections.abc import Callable
 from datetime import date
 
+from money_manager.domain.debts import debt_summary
 from money_manager.domain.investments import NetWorthPoint, value_on
 from money_manager.domain.money import DEFAULT_CURRENCY, sum_money
 from money_manager.domain.periods import add_months, month_end, month_start
 from money_manager.persistence.database import Database
 from money_manager.persistence.repositories import AccountRepository
 from money_manager.services.balance_service import BalanceService
+from money_manager.services.debt_service import load_debts
 from money_manager.services.investment_service import InvestmentService
 
 NET_WORTH_MONTHS = 12
@@ -45,6 +47,7 @@ class NetWorthService:
             today = month_end(until)
         with self._database.session() as session:
             openings = [m.opening_date for m in AccountRepository(session).list_all()]
+            debts = load_debts(session, self._currency)
         if not openings:
             return []
         current = month_start(today)
@@ -56,6 +59,7 @@ class NetWorthService:
             values = (value_on(p.valuations, day) for p in positions)
             points.append(NetWorthPoint(
                 month, day, self._balances.total_balance(day),
-                sum_money((v for v in values if v is not None), self._currency)))
+                sum_money((v for v in values if v is not None), self._currency),
+                debt_summary(debts, self._currency, day).net))
             month = add_months(month, 1)
         return points

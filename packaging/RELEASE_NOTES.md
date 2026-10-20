@@ -1,10 +1,25 @@
-# Money Manager 1.4.0
+# Money Manager 1.5.0
 
 A local-first personal finance application for Windows. Your data stays in a
 database on your computer; nothing is sent anywhere unless you use online AI
 and confirm each request.
 
-## What's new in 1.4.0
+## What's new in 1.5.0
+
+- **En français.** Settings → Appearance → Language: English, Français, or the
+  same as Windows. Amounts and dates are written the French way
+  (12 000,50 MAD, 5 mars 2026), and online AI answers in French.
+- **Loans and debts.** On the Accounts page: money you lent or borrowed, its
+  repayments and what is left. Loans count in your net worth.
+- **Receipts.** Attach a photo or PDF of a receipt to any entry
+  (Transactions → *Receipts…*). Receipts are part of your backups.
+- **Password-protected backups.** Tick *Protect the backup with a password*
+  when exporting: the file is encrypted (AES-256).
+- **Yearly report.** Statistics → *Yearly report…* saves a PDF of the whole year.
+- **Update check.** Settings → Updates (off unless you switch it on): find out
+  when a new version is published.
+
+## New in 1.4.0
 
 - **Installer.** `MoneyManager-1.4.0-Setup.exe` installs Money Manager for you
   (no administrator rights), adds it to the Start menu and Settings → Apps, and

@@ -22,6 +22,7 @@ from money_manager.ui.formatting import format_date
 from money_manager.ui.goals.goal_dialog import amount_edit
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import to_qdate
+from money_manager.core.i18n import tr
 
 
 class RecordPaymentDialog(QDialog):
@@ -39,14 +40,14 @@ class RecordPaymentDialog(QDialog):
         self.saved: Transaction | None = None
         today = services.today()
 
-        self.setWindowTitle(f"Record payment · {subscription.name}")
+        self.setWindowTitle(tr("Record payment · {0}", subscription.name))
         self.setModal(True)
         self.setMinimumWidth(440)
 
         following = advance(due_date, subscription.frequency, subscription.anchor_day)
         info = QLabel(
-            f"Confirms the payment due {format_date(due_date)} by recording one expense. "
-            f"The next payment will then be due {format_date(following)}."
+            tr("Confirms the payment due {0} by recording one expense. The next payment "
+               "will then be due {1}.", format_date(due_date), format_date(following))
         )
         info.setObjectName("CardBody")
         info.setWordWrap(True)
@@ -63,13 +64,13 @@ class RecordPaymentDialog(QDialog):
         if subscription.account_id is not None:
             self.account_combo.setCurrentIndex(
                 max(self.account_combo.findData(subscription.account_id), 0))
-        self.account_combo.setPlaceholderText("Create an account first")
+        self.account_combo.setPlaceholderText(tr("Create an account first"))
 
         # ``occurred_on`` is the transaction's own field name for the date.
         self.fields: dict[str, FormField] = {
-            "amount": FormField(f"Amount paid ({services.base_currency})", self.amount_edit),
-            "occurred_on": FormField("Paid on", self.date_edit),
-            "account_id": FormField("Paid from", self.account_combo),
+            "amount": FormField(tr("Amount paid ({0})", services.base_currency), self.amount_edit),
+            "occurred_on": FormField(tr("Paid on"), self.date_edit),
+            "account_id": FormField(tr("Paid from"), self.account_combo),
         }
         self.form_error = QLabel()
         self.form_error.setObjectName("FormError")
@@ -80,7 +81,7 @@ class RecordPaymentDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        ok.setText("Record payment")
+        ok.setText(tr("Record payment"))
         ok.setObjectName("PrimaryButton")
         buttons.accepted.connect(self.submit)
         buttons.rejected.connect(self.reject)

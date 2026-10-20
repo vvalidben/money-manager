@@ -29,10 +29,11 @@ from money_manager.ui.ai.background import BackgroundCall, run_in_background
 from money_manager.ui.lock import hello
 from money_manager.ui.lock.hello import HelloResult, HelloStatus, Verifier
 from money_manager.ui.theme import Spacing
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
-UNLOCK_MESSAGE = "Unlock Money Manager"
+UNLOCK_MESSAGE = tr("Unlock Money Manager")
 AUTO_PROMPT_DELAY_MS = 350
 _ACTIVITY = frozenset({QEvent.Type.MouseButtonPress, QEvent.Type.MouseMove,
                        QEvent.Type.KeyPress, QEvent.Type.Wheel})
@@ -48,19 +49,19 @@ class LockScreen(QWidget):
         super().__init__(parent)
         self.setObjectName("ContentArea")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.title = QLabel("Money Manager is locked")
+        self.title = QLabel(tr("Money Manager is locked"))
         self.title.setObjectName("EmptyHeading")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.message = QLabel("Confirm it's you with Windows Hello — your PIN, fingerprint "
-                              "or face.")
+        self.message = QLabel(tr("Confirm it's you with Windows Hello — your PIN, fingerprint "
+                              "or face."))
         self.message.setObjectName("MutedLabel")
         self.message.setWordWrap(True)
         self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.message.setMaximumWidth(460)
-        self.unlock_button = QPushButton("Unlock with Windows Hello")
+        self.unlock_button = QPushButton(tr("Unlock with Windows Hello"))
         self.unlock_button.setObjectName("PrimaryButton")
         self.unlock_button.clicked.connect(self.unlock_requested)
-        self.open_button = QPushButton("Open without the lock")
+        self.open_button = QPushButton(tr("Open without the lock"))
         self.open_button.clicked.connect(self.open_requested)
         self.open_button.hide()
         layout = QVBoxLayout(self)
@@ -76,8 +77,8 @@ class LockScreen(QWidget):
 
     def set_busy(self, busy: bool) -> None:
         self.unlock_button.setEnabled(not busy)
-        self.unlock_button.setText("Waiting for Windows Hello…" if busy
-                                   else "Unlock with Windows Hello")
+        self.unlock_button.setText(tr("Waiting for Windows Hello…") if busy
+                                   else tr("Unlock with Windows Hello"))
 
 
 class AppLock(QObject):
@@ -150,8 +151,8 @@ class AppLock(QObject):
         self._watch_activity(True)
         self.place()
         self.screen.open_button.hide()
-        self.screen.show_message("Confirm it's you with Windows Hello — your PIN, fingerprint "
-                                 "or face.")
+        self.screen.show_message(tr("Confirm it's you with Windows Hello — your PIN, fingerprint "
+                                 "or face."))
         self.screen.set_busy(False)
         self.screen.show()
         self.screen.raise_()
@@ -180,9 +181,9 @@ class AppLock(QObject):
         if result is HelloResult.VERIFIED:
             self._release()
         elif result is HelloResult.CANCELED:
-            self.screen.show_message("Unlock was cancelled. Choose Unlock to try again.")
+            self.screen.show_message(tr("Unlock was cancelled. Choose Unlock to try again."))
         elif result is HelloResult.FAILED:
-            self.screen.show_message("Windows Hello could not confirm it's you. Try again.")
+            self.screen.show_message(tr("Windows Hello could not confirm it's you. Try again."))
         else:
             self._unavailable()
 
@@ -194,10 +195,10 @@ class AppLock(QObject):
     def _unavailable(self) -> None:
         status = self.verifier.status()
         detail = (status.explanation if status is not HelloStatus.AVAILABLE
-                  else "Windows Hello did not answer.")
+                  else tr("Windows Hello did not answer."))
         self.screen.show_message(
-            f"{detail} You can open Money Manager without the lock and turn it off or set "
-            "Windows Hello up again.")
+            tr("{0} You can open Money Manager without the lock and turn it off or set "
+               "Windows Hello up again.", detail))
         self.screen.open_button.setVisible(status is not HelloStatus.AVAILABLE)
 
     def _open_without_lock(self) -> None:

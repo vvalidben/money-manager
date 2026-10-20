@@ -55,6 +55,7 @@ from money_manager.persistence.repositories import (
     SubscriptionRepository,
 )
 from money_manager.services.transaction_service import TransactionService
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +223,7 @@ class SubscriptionService:
             self._check_confirmable(session, model, due_date, today)
             chosen_account = account_id if account_id is not None else model.account_id
             if chosen_account is None:
-                raise ValidationError("Choose the account the payment was made from.",
+                raise ValidationError(tr("Choose the account the payment was made from."),
                                       "account_id")
             transaction = self._transactions.create_in_session(
                 session,
@@ -234,7 +235,7 @@ class SubscriptionService:
                     occurred_on=paid_on if paid_on is not None else min(due_date, today),
                     category_id=model.category_id,
                     description=model.name,
-                    notes=f"Subscription payment due {due_date.isoformat()}",
+                    notes=tr("Subscription payment due {0}", due_date.isoformat()),
                 ),
             )
             self._confirm(session, model, due_date, PaymentStatus.PAID, transaction.id)
@@ -258,23 +259,21 @@ class SubscriptionService:
         self, session: Session, model: SubscriptionModel, due_date: object, today: date
     ) -> None:
         if isinstance(due_date, datetime) or not isinstance(due_date, date):
-            raise ValidationError("Enter a valid calendar date.", "due_date")
+            raise ValidationError(tr("Enter a valid calendar date."), "due_date")
         if not model.is_active:
-            raise ValidationError(f"'{model.name}' is paused; resume it first.", "due_date")
+            raise ValidationError(tr("'{0}' is paused; resume it first.", model.name), "due_date")
         if SubscriptionRepository(session).payment_for(model.id, due_date) is not None:
             raise ConflictError(
-                f"The payment of '{model.name}' due {due_date.isoformat()} has already been "
-                "confirmed."
+                tr("The payment of '{0}' due {1} has already been confirmed.", model.name, due_date.isoformat())
             )
         if due_date != model.next_payment_date:
             raise ConflictError(
-                f"The next payment of '{model.name}' to confirm is the one due "
-                f"{model.next_payment_date.isoformat()}."
+                tr("The next payment of '{0}' to confirm is the one due {1}.", model.name, model.next_payment_date.isoformat())
             )
         if due_date > today + timedelta(days=EARLY_PAYMENT_DAYS):
             raise ValidationError(
-                f"This payment is not due until {due_date.isoformat()}; it can be confirmed "
-                f"at most {EARLY_PAYMENT_DAYS} days early.",
+                tr("This payment is not due until {0}; it can be confirmed at most {1} days "
+                   "early.", due_date.isoformat(), EARLY_PAYMENT_DAYS),
                 "due_date",
             )
 
@@ -307,7 +306,7 @@ class SubscriptionService:
     ) -> ValidSubscription:
         category_model = CategoryRepository(session).get(validate_id(category_id, "category_id"))
         if category_model is None:
-            raise ValidationError("The selected category does not exist.", "category_id")
+            raise ValidationError(tr("The selected category does not exist."), "category_id")
         return validate_subscription(
             name=name,
             amount=amount,
@@ -325,24 +324,24 @@ class SubscriptionService:
         if account_id is None:
             return
         if AccountRepository(session).get(validate_id(account_id, "account_id")) is None:
-            raise ValidationError("The selected account does not exist.", "account_id")
+            raise ValidationError(tr("The selected account does not exist."), "account_id")
 
     @staticmethod
     def _ensure_name_available(session: Session, name: str, exclude_id: int | None = None) -> None:
         existing = SubscriptionRepository(session).get_by_normalized_name(normalize_name(name))
         if existing is not None and existing.id != exclude_id:
-            raise ConflictError(f"A subscription named '{existing.name}' already exists.")
+            raise ConflictError(tr("A subscription named '{0}' already exists.", existing.name))
 
     @staticmethod
     def _require(session: Session, subscription_id: int) -> SubscriptionModel:
         repository = SubscriptionRepository(session)
         model = repository.get(subscription_id) if is_record_id(subscription_id) else None
         if model is None:
-            raise NotFoundError(f"Subscription {subscription_id!r} does not exist.")
+            raise NotFoundError(tr("Subscription {0!r} does not exist.", subscription_id))
         return model
 
 
 def _flag(value: object) -> bool:
     if not isinstance(value, bool):
-        raise ValidationError("Choose active or paused.", "is_active")
+        raise ValidationError(tr("Choose active or paused."), "is_active")
     return value

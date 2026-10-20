@@ -13,6 +13,7 @@ from money_manager.domain.validation import positive_amount, validate_id
 from money_manager.persistence.database import Database
 from money_manager.persistence.models import BudgetModel
 from money_manager.persistence.repositories import BudgetRepository, CategoryRepository
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -50,14 +51,14 @@ class BudgetService:
         with self._database.session() as session:
             category = CategoryRepository(session).get(category_id)
             if category is None:
-                raise ValidationError("The selected category does not exist.", "category_id")
+                raise ValidationError(tr("The selected category does not exist."), "category_id")
             if category.kind != CategoryKind.EXPENSE.value:
-                raise ValidationError("Budgets are for expense categories.", "category_id")
+                raise ValidationError(tr("Budgets are for expense categories."), "category_id")
             budgets = BudgetRepository(session)
             model = budgets.for_category(category_id)
             if model is None:
                 if category.is_archived:
-                    raise ValidationError(f"The category '{category.name}' is archived.",
+                    raise ValidationError(tr("The category '{0}' is archived.", category.name),
                                           "category_id")
                 model = budgets.add(BudgetModel(category_id=category_id,
                                                 amount_minor=limit.minor_units))
@@ -73,7 +74,7 @@ class BudgetService:
             budgets = BudgetRepository(session)
             model = budgets.for_category(validate_id(category_id, "category_id"))
             if model is None:
-                raise NotFoundError("This category has no budget.")
+                raise NotFoundError(tr("This category has no budget."))
             budgets.delete(model)
         logger.info("Budget for category %s removed", category_id)
 

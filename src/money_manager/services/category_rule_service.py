@@ -15,6 +15,7 @@ from money_manager.domain.validation import validate_id
 from money_manager.persistence.database import Database
 from money_manager.persistence.models import CategoryRuleModel
 from money_manager.persistence.repositories import CategoryRepository, CategoryRuleRepository
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class CategoryRuleService:
     def add(self, keyword: str, category_id: int) -> CategoryRule:
         cleaned = clean_keyword(keyword)
         if cleaned is None:
-            raise ValidationError("Enter a keyword of 2 to 60 letters or digits.", "keyword")
+            raise ValidationError(tr("Enter a keyword of 2 to 60 letters or digits."), "keyword")
         return self._save(cleaned, category_id)
 
     def remove(self, rule_id: int) -> None:
@@ -66,7 +67,7 @@ class CategoryRuleService:
             rules = CategoryRuleRepository(session)
             model = rules.get(validate_id(rule_id, "rule_id"))
             if model is None:
-                raise NotFoundError(f"Rule {rule_id!r} does not exist.")
+                raise NotFoundError(tr("Rule {0!r} does not exist.", rule_id))
             rules.delete(model)
         logger.info("Removed category rule %s", rule_id)
 
@@ -74,7 +75,7 @@ class CategoryRuleService:
         with self._database.session() as session:
             category = CategoryRepository(session).get(validate_id(category_id, "category_id"))
             if category is None:
-                raise ValidationError("The selected category does not exist.", "category_id")
+                raise ValidationError(tr("The selected category does not exist."), "category_id")
             rules = CategoryRuleRepository(session)
             model = rules.find(keyword, category.kind)
             if model is None:

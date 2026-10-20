@@ -18,6 +18,7 @@ from money_manager.ui.formatting import (
     format_percent,
     format_signed_money,
 )
+from money_manager.core.i18n import tr
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,16 +47,15 @@ def account_cards(accounts: Sequence[Account],
         balance = breakdown.balance
         share = ratio(balance, assets) if balance.is_positive() else None
         if balance.is_negative():
-            share_text = "Owed"
+            share_text = tr("Owed")
         elif share is None:
-            share_text = "Empty"
+            share_text = tr("Empty")
         else:
-            share_text = f"{format_percent(share)} of what you have"
+            share_text = tr("{0} of what you have", format_percent(share))
         adjustments = breakdown.adjustments_in - breakdown.adjustments_out
-        activity = (f"Since the start: in {format_money(breakdown.income)} · "
-                    f"out {format_money(breakdown.expenses)}"
+        activity = (tr("Since the start: in {0} · out {1}", format_money(breakdown.income), format_money(breakdown.expenses))
                     + ("" if adjustments.is_zero()
-                       else f" · adjustments and transfers {format_signed_money(adjustments)}"))
+                       else tr(" · adjustments and transfers {0}", format_signed_money(adjustments))))
         cards.append(AccountCardView(
             account_id=account.id,
             name=account.name,
@@ -63,8 +63,7 @@ def account_cards(accounts: Sequence[Account],
             is_negative=balance.is_negative(),
             share_fraction=min(max(share or Decimal(0), Decimal(0)), Decimal(1)),
             share=share_text,
-            since=(f"Tracked since {format_date(account.opening_date)} · opening balance "
-                   f"{format_money(account.opening_balance)}"),
+            since=(tr("Tracked since {0} · opening balance {1}", format_date(account.opening_date), format_money(account.opening_balance))),
             activity=activity,
         ))
     cards.sort(key=lambda c: -breakdowns[c.account_id].balance.amount)
@@ -78,10 +77,10 @@ def summary_stats(breakdowns: dict[int, BalanceBreakdown], currency: str) -> tup
     owed = sum_money((-b for b in balances if b.is_negative()), currency)
     count = len(balances)
     return (
-        StatView("Total balance", format_money(total), "All accounts together",
+        StatView(tr("Total balance"), format_money(total), tr("All accounts together"),
                  "outflow" if total.is_negative() else "neutral"),
-        StatView("What you have", format_money(assets), "Accounts in credit"),
-        StatView("What you owe", format_money(owed),
-                 "Nothing owed" if owed.is_zero() else "Accounts below zero (e.g. cards)"),
-        StatView("Accounts", str(count), "Transfers move money between them"),
+        StatView(tr("What you have"), format_money(assets), tr("Accounts in credit")),
+        StatView(tr("What you owe"), format_money(owed),
+                 tr("Nothing owed") if owed.is_zero() else tr("Accounts below zero (e.g. cards)")),
+        StatView(tr("Accounts"), str(count), tr("Transfers move money between them")),
     )

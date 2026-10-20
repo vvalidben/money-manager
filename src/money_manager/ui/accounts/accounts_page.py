@@ -24,11 +24,13 @@ from money_manager.ui.accounts.account_dialog import AccountDialog
 from money_manager.ui.accounts.correct_balance_dialog import CorrectBalanceDialog
 from money_manager.ui.accounts.view_model import AccountCardView, account_cards, summary_stats
 from money_manager.ui.components import Card, EmptyState, ResponsiveRow, StatCard
+from money_manager.ui.debts.loans_card import LoansCard
 from money_manager.ui.formatting import format_money, format_signed_money
 from money_manager.ui.pages.base_page import BasePage
 from money_manager.ui.pages.registry import PageSpec
 from money_manager.ui.theme import Spacing, set_style_property
 from money_manager.ui.transactions.transfer_dialog import TransferDialog
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -70,12 +72,12 @@ class AccountCard(Card):
 
         actions = QHBoxLayout()
         actions.setSpacing(Spacing.SM)
-        correct = QPushButton("Correct balance…")
-        correct.setToolTip("Match the balance your bank shows (recorded as an adjustment)")
+        correct = QPushButton(tr("Correct balance…"))
+        correct.setToolTip(tr("Match the balance your bank shows (recorded as an adjustment)"))
         correct.clicked.connect(lambda: self.correct_requested.emit(view.account_id))
-        edit = QPushButton("Edit")
+        edit = QPushButton(tr("Edit"))
         edit.clicked.connect(lambda: self.edit_requested.emit(view.account_id))
-        delete = QPushButton("Delete")
+        delete = QPushButton(tr("Delete"))
         delete.setObjectName("DangerButton")
         delete.clicked.connect(lambda: self.delete_requested.emit(view.account_id))
         actions.addWidget(correct)
@@ -94,25 +96,25 @@ class AccountsPage(BasePage):
         self.breakdowns: dict[int, BalanceBreakdown] = {}
         self.cards: list[AccountCard] = []
 
-        self.new_button = QPushButton("New account")
+        self.new_button = QPushButton(tr("New account"))
         self.new_button.setObjectName("PrimaryButton")
-        self.new_button.setToolTip("New account (Ctrl+N)")
+        self.new_button.setToolTip(tr("New account (Ctrl+N)"))
         self.new_button.clicked.connect(self.create_account)
         self.header.add_action(self.new_button)
         self.primary_button = self.new_button
-        self.transfer_button = QPushButton("Transfer")
-        self.transfer_button.setToolTip("Move money between two of your accounts")
+        self.transfer_button = QPushButton(tr("Transfer"))
+        self.transfer_button.setToolTip(tr("Move money between two of your accounts"))
         self.transfer_button.clicked.connect(self.transfer)
         self.header.add_action(self.transfer_button)
 
         self.stat_cards = tuple(StatCard("", compact=True) for _ in range(4))
         self.stats_row = ResponsiveRow(self.stat_cards, min_item_width=190)
         self.empty_state = EmptyState(
-            "No accounts yet",
-            "An account is where your money is kept: a bank account, your cash wallet or a "
-            "card. Add the first one with the balance it has today.",
+            tr("No accounts yet"),
+            tr("An account is where your money is kept: a bank account, your cash wallet or a "
+            "card. Add the first one with the balance it has today."),
             badge=None,
-            action_text="Create account",
+            action_text=tr("Create account"),
         )
         self.empty_state.action_clicked.connect(self.create_account)
 
@@ -129,6 +131,9 @@ class AccountsPage(BasePage):
         content_layout.addWidget(self.stats_row)
         content_layout.addWidget(self.empty_state)
         content_layout.addWidget(self.cards_host)
+        self.loans_card = LoansCard(services)
+        self.loans_card.changed.connect(self._loans_changed)
+        content_layout.addWidget(self.loans_card)
         content_layout.addStretch(1)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -148,7 +153,7 @@ class AccountsPage(BasePage):
             breakdowns = {a.id: self._services.balances.breakdown(a.id) for a in accounts}
         except MoneyManagerError as exc:
             logger.warning("Could not load accounts: %s", exc)
-            dialogs.show_warning(self, "Could not load accounts", str(exc))
+            dialogs.show_warning(self, tr("Could not load accounts"), str(exc))
             return
         self.accounts, self.breakdowns = accounts, breakdowns
         for card, stat in zip(self.stat_cards, summary_stats(breakdowns,
@@ -160,10 +165,15 @@ class AccountsPage(BasePage):
         self._rebuild_cards(account_cards(accounts, breakdowns))
         has_accounts = bool(accounts)
         self.empty_state.setVisible(not has_accounts)
-        for widget in (self.new_button, self.stats_row, self.cards_host):
+        for widget in (self.new_button, self.stats_row, self.cards_host, self.loans_card):
             widget.setVisible(has_accounts)
+        self.loans_card.load()
         self.transfer_button.setVisible(has_accounts)
         self.transfer_button.setEnabled(len(accounts) > 1)
+
+    def _loans_changed(self, title: str, detail: str) -> None:
+        self.refresh()  # balances move when a loan goes through an account
+        self.notice.emit(title, detail)
 
     def card_for(self, account_id: int) -> AccountCard:
         return next(card for card in self.cards if card.view.account_id == account_id)
@@ -195,13 +205,13 @@ class AccountsPage(BasePage):
         dialog = self.make_account_dialog(None)
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved is not None:
             self.refresh()
-            self.notice.emit("Account created", dialog.saved.name)
+            self.notice.emit(tr("Account created"), dialog.saved.name)
 
     def edit_account(self, account_id: int) -> None:
         dialog = self.make_account_dialog(self._account(account_id))
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved is not None:
             self.refresh()
-            self.notice.emit("Account updated", dialog.saved.name)
+            self.notice.emit(tr("Account updated"), dialog.saved.name)
 
     def correct_balance(self, account_id: int) -> None:
         account = self._account(account_id)
@@ -210,24 +220,23 @@ class AccountsPage(BasePage):
             return
         self.refresh()
         if dialog.adjustment is None:
-            self.notice.emit("Balance already correct", account.name)
+            self.notice.emit(tr("Balance already correct"), account.name)
         else:
-            self.notice.emit("Balance corrected", f"{account.name} · adjustment "
-                             f"{format_signed_money(dialog.adjustment.signed_amount)}")
+            self.notice.emit(tr("Balance corrected"), tr("{0} · adjustment {1}", account.name, format_signed_money(dialog.adjustment.signed_amount)))
 
     def delete_account(self, account_id: int) -> None:
         account = self._account(account_id)
-        message = (f"Delete the account {account.name}?\n\nOnly an account without any "
-                   "transactions can be deleted. This cannot be undone.")
-        if not dialogs.confirm_destructive(self, "Delete account", message):
+        message = (tr("Delete the account {0}?\n\nOnly an account without any transactions can "
+                      "be deleted. This cannot be undone.", account.name))
+        if not dialogs.confirm_destructive(self, tr("Delete account"), message):
             return
         try:
             self._services.accounts.delete(account_id)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not delete the account", str(exc))
+            dialogs.show_warning(self, tr("Could not delete the account"), str(exc))
             return
         self.refresh()
-        self.notice.emit("Account deleted", account.name)
+        self.notice.emit(tr("Account deleted"), account.name)
 
     def transfer(self) -> None:
         dialog = self.make_transfer_dialog()
@@ -235,7 +244,7 @@ class AccountsPage(BasePage):
             transfer = dialog.saved
             self.refresh()
             names = {a.id: a.name for a in self.accounts}
-            self.notice.emit("Transfer recorded",
+            self.notice.emit(tr("Transfer recorded"),
                              f"{format_money(transfer.amount)} · "
                              f"{names.get(transfer.from_account_id, '?')} → "
                              f"{names.get(transfer.to_account_id, '?')}")

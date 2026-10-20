@@ -54,6 +54,7 @@ from money_manager.ui.investments.view_model import (
 from money_manager.ui.pages.base_page import BasePage
 from money_manager.ui.pages.registry import PageSpec
 from money_manager.ui.theme import SIDE_BY_SIDE_MIN_WIDTH, Spacing
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +72,10 @@ class InvestmentsPage(BasePage):
         self._entries: list[InvestmentEntry] = []
         self._valuations: list[Valuation] = []
 
-        self.new_button = QPushButton("New investment")
+        self.new_button = QPushButton(tr("New investment"))
         self.new_button.setObjectName("PrimaryButton")
         self.new_button.clicked.connect(self.create_investment)
-        self.new_button.setToolTip("New investment (Ctrl+N)")
+        self.new_button.setToolTip(tr("New investment (Ctrl+N)"))
         self.header.add_action(self.new_button)
         self.primary_button = self.new_button
 
@@ -82,7 +83,7 @@ class InvestmentsPage(BasePage):
         self.stats_row = ResponsiveRow(self.stat_cards, min_item_width=200)
 
         # Holdings
-        self.holdings_card = Card("Holdings")
+        self.holdings_card = Card(tr("Holdings"))
         self.table = QTableWidget()
         self.table.setObjectName("DataTable")
         self.table.setColumnCount(len(HOLDING_HEADERS))
@@ -103,7 +104,7 @@ class InvestmentsPage(BasePage):
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # name takes the rest
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.table.doubleClicked.connect(lambda _index: self.edit_selected())
-        self.show_archived = QPushButton("Show archived")
+        self.show_archived = QPushButton(tr("Show archived"))
         self.show_archived.setCheckable(True)
         self.show_archived.toggled.connect(lambda _checked: self.refresh())
         holdings_actions = QHBoxLayout()
@@ -112,7 +113,7 @@ class InvestmentsPage(BasePage):
         self.holdings_card.body.addWidget(self.table)
         self.holdings_card.body.addLayout(holdings_actions)
 
-        self.kind_card = ChartCard("Value by type", "Latest known values",
+        self.kind_card = ChartCard(tr("Value by type"), tr("Latest known values"),
                                    CategoryShareChart(center_label="value"))
 
         # Selected holding
@@ -125,12 +126,12 @@ class InvestmentsPage(BasePage):
         self.detail_notes = QLabel()
         self.detail_notes.setObjectName("CardBody")
         self.detail_notes.setWordWrap(True)
-        self.contribute_button = self._button("Add contribution", self.add_contribution, True)
-        self.withdraw_button = self._button("Withdraw", self.add_withdrawal)
-        self.value_button = self._button("Update value", self.update_value)
-        self.edit_button = self._button("Edit", self.edit_selected)
-        self.archive_button = self._button("Archive", self.toggle_archived)
-        self.delete_button = self._button("Delete", self.delete_selected)
+        self.contribute_button = self._button(tr("Add contribution"), self.add_contribution, True)
+        self.withdraw_button = self._button(tr("Withdraw"), self.add_withdrawal)
+        self.value_button = self._button(tr("Update value"), self.update_value)
+        self.edit_button = self._button(tr("Edit"), self.edit_selected)
+        self.archive_button = self._button(tr("Archive"), self.toggle_archived)
+        self.delete_button = self._button(tr("Delete"), self.delete_selected)
         self.delete_button.setObjectName("DangerButton")
         # Two groups that wrap as units on narrow windows.
         detail_actions = FlowRow([
@@ -143,23 +144,23 @@ class InvestmentsPage(BasePage):
         self.detail_card.body.addWidget(detail_actions)
 
         self.entries_card = DataTableCard(
-            "Contributions & withdrawals",
-            "Deleting a contribution paid from your accounts also deletes its expense.",
+            tr("Contributions & withdrawals"),
+            tr("Deleting a contribution paid from your accounts also deletes its expense."),
             selectable=True,
         )
-        self.delete_entry_button = self._button("Delete selected", self.delete_selected_entry)
+        self.delete_entry_button = self._button(tr("Delete selected"), self.delete_selected_entry)
         self.entries_card.body.addWidget(self.delete_entry_button, 0, Qt.AlignmentFlag.AlignRight)
-        self.values_card = DataTableCard("Value history", selectable=True)
-        self.delete_value_button = self._button("Delete selected", self.delete_selected_value)
+        self.values_card = DataTableCard(tr("Value history"), selectable=True)
+        self.delete_value_button = self._button(tr("Delete selected"), self.delete_selected_value)
         self.values_card.body.addWidget(self.delete_value_button, 0, Qt.AlignmentFlag.AlignRight)
 
         self.empty_state = EmptyState(
-            "No investments yet",
-            "Track stocks, ETFs, crypto, gold or anything else: record what you put in and, "
+            tr("No investments yet"),
+            tr("Track stocks, ETFs, crypto, gold or anything else: record what you put in and, "
             "from time to time, what it is worth. Profit and return appear once a value is "
-            "entered.",
+            "entered."),
             badge=None,
-            action_text="Add investment",
+            action_text=tr("Add investment"),
         )
         self.empty_state.action_clicked.connect(self.create_investment)
 
@@ -212,7 +213,7 @@ class InvestmentsPage(BasePage):
             everything = self._services.investments.list(include_archived=True)
         except MoneyManagerError as exc:
             logger.warning("Could not load investments: %s", exc)
-            dialogs.show_warning(self, "Could not load investments", str(exc))
+            dialogs.show_warning(self, tr("Could not load investments"), str(exc))
             return
         self.summary = summary
         show_archived = self.show_archived.isChecked()
@@ -282,15 +283,15 @@ class InvestmentsPage(BasePage):
         active = not investment.is_archived
         for button in (self.contribute_button, self.withdraw_button, self.value_button):
             button.setEnabled(active)
-        self.archive_button.setText("Archive" if active else "Restore")
+        self.archive_button.setText(tr("Archive") if active else tr("Restore"))
         entries = list(reversed(position.entries))  # newest first
         self._entries = entries
         self.entries_card.set_rows(ENTRY_HEADERS, [entry_row(e) for e in entries],
-                                   "No contributions yet.", text_columns=4)
+                                   tr("No contributions yet."), text_columns=4)
         valuations = sorted(position.valuations, key=lambda v: (v.valued_on, v.id), reverse=True)
         self._valuations = valuations
         self.values_card.set_rows(VALUE_HEADERS, [value_row(v) for v in valuations],
-                                  "No value entered yet.")
+                                  tr("No value entered yet."))
         self.delete_entry_button.setVisible(bool(entries))
         self.delete_value_button.setVisible(bool(valuations))
 
@@ -334,9 +335,9 @@ class InvestmentsPage(BasePage):
         if position is None:
             return
         if dialogs.confirm_destructive(
-            self, "Delete investment",
-            f"Delete “{position.investment.name}” and its history? Expenses already recorded "
-            "for its contributions stay in your transactions.",
+            self, tr("Delete investment"),
+            tr("Delete “{0}” and its history? Expenses already recorded for its "
+               "contributions stay in your transactions.", position.investment.name),
         ):
             self._selected_id = None
             self._run(lambda: self._services.investments.delete(position.investment.id))
@@ -346,10 +347,10 @@ class InvestmentsPage(BasePage):
         if row is None:
             return
         entry = self._entries[row]
-        extra = (" Its expense will be deleted too and your balance recalculated."
+        extra = (tr(" Its expense will be deleted too and your balance recalculated.")
                  if entry.transaction_id is not None else "")
-        if dialogs.confirm_destructive(self, "Delete entry",
-                                       f"Delete this {entry.kind.value}?{extra}"):
+        if dialogs.confirm_destructive(self, tr("Delete entry"),
+                                       tr("Delete this {0}?{1}", tr(entry.kind.value), extra)):
             self._run(lambda: self._services.investments.delete_entry(entry.id))
 
     def delete_selected_value(self) -> None:
@@ -357,7 +358,7 @@ class InvestmentsPage(BasePage):
         if row is None:
             return
         valuation = self._valuations[row]
-        if dialogs.confirm_destructive(self, "Delete value", "Delete this value?"):
+        if dialogs.confirm_destructive(self, tr("Delete value"), tr("Delete this value?")):
             self._run(lambda: self._services.investments.delete_valuation(valuation.id))
 
     def _exec(self, dialog: QDialog) -> None:
@@ -368,7 +369,7 @@ class InvestmentsPage(BasePage):
         try:
             action()
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not update the investment", str(exc))
+            dialogs.show_warning(self, tr("Could not update the investment"), str(exc))
         self.refresh()
 
     @staticmethod

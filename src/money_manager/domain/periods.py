@@ -4,6 +4,7 @@ from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, timedelta
 from enum import StrEnum
+from money_manager.core.i18n import tr
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,7 +16,7 @@ class DateRange:
 
     def __post_init__(self) -> None:
         if self.start > self.end:
-            raise ValueError("start must not be after end")
+            raise ValueError(tr("start must not be after end"))
 
     @property
     def days(self) -> int:
@@ -72,7 +73,7 @@ def rolling_range(preset: StatsRange, today: date) -> DateRange:
         case StatsRange.YEAR_1:
             return DateRange(shift_months(today, -12) + timedelta(days=1), today)
         case StatsRange.CUSTOM:
-            raise ValueError("A custom range has no preset dates.")
+            raise ValueError(tr("A custom range has no preset dates."))
 
 
 def previous_range(period: DateRange) -> DateRange:

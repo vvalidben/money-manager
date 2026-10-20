@@ -61,8 +61,11 @@ from money_manager.persistence.models import (
     InvestmentValuationModel,
 )
 from money_manager.persistence.repositories import CategoryRepository, InvestmentRepository
+from money_manager.domain.debts import debt_summary
 from money_manager.services.allocation_ledger import AllocationLedger
+from money_manager.services.debt_service import load_debts
 from money_manager.services.transaction_service import TransactionService
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +104,8 @@ class InvestmentService:
             models = InvestmentRepository(session).list_all(include_archived=False)
             positions = self._positions(session, models)
             balance = AllocationLedger(session, self._currency).total_balance()
-        return PortfolioSummary(tuple(positions), balance, self._currency)
+            debts = debt_summary(load_debts(session, self._currency), self._currency).net
+        return PortfolioSummary(tuple(positions), balance, self._currency, debts)
 
     # ------------------------------------------------------------ investments
 
@@ -135,7 +139,7 @@ class InvestmentService:
     def set_archived(self, investment_id: int, archived: bool) -> InvestmentPosition:
         """Archive a closed position: it leaves the portfolio totals but keeps its history."""
         if not isinstance(archived, bool):
-            raise ValidationError("Choose archived or active.", "is_archived")
+            raise ValidationError(tr("Choose archived or active."), "is_archived")
         with self._database.session() as session:
             model = self._require(session, investment_id)
             model.is_archived = archived
@@ -189,7 +193,7 @@ class InvestmentService:
                         occurred_on=on,
                         category_id=category_id,
                         description=model.name,
-                        notes=clean_note or CONTRIBUTION_NOTE,
+                        notes=clean_note or tr(CONTRIBUTION_NOTE),
                         allocation_id=allocation_id,
                     ),
                 )
@@ -220,7 +224,7 @@ class InvestmentService:
             repository = InvestmentRepository(session)
             entry = repository.get_entry(entry_id) if is_record_id(entry_id) else None
             if entry is None:
-                raise NotFoundError(f"Entry {entry_id!r} does not exist.")
+                raise NotFoundError(tr("Entry {0!r} does not exist.", entry_id))
             transaction_id = entry.transaction_id
             if transaction_id is None:
                 repository.delete_entry(entry)
@@ -261,7 +265,7 @@ class InvestmentService:
             valuation = (repository.get_valuation(valuation_id)
                          if is_record_id(valuation_id) else None)
             if valuation is None:
-                raise NotFoundError(f"Valuation {valuation_id!r} does not exist.")
+                raise NotFoundError(tr("Valuation {0!r} does not exist.", valuation_id))
             repository.delete_valuation(valuation)
 
     # --------------------------------------------------------------- helpers
@@ -300,15 +304,15 @@ class InvestmentService:
     @staticmethod
     def _require_investment_category(session: Session, category_id: int | None) -> None:
         if category_id is None:
-            raise ValidationError("Choose the investment category for the expense.",
+            raise ValidationError(tr("Choose the investment category for the expense."),
                                   "category_id")
         category = CategoryRepository(session).get(validate_id(category_id, "category_id"))
         if category is None:
-            raise ValidationError("The selected category does not exist.", "category_id")
+            raise ValidationError(tr("The selected category does not exist."), "category_id")
         if category.kind != CategoryKind.EXPENSE.value or not category.is_investment:
             raise ValidationError(
-                f"'{category.name}' is not an investment category. Mark it as one (Statistics → "
-                "Investment categories) or choose another.",
+                tr("'{0}' is not an investment category. Mark it as one (Statistics → "
+                   "Investment categories) or choose another.", category.name),
                 "category_id",
             )
 
@@ -316,18 +320,18 @@ class InvestmentService:
     def _ensure_name_available(session: Session, name: str, exclude_id: int | None = None) -> None:
         existing = InvestmentRepository(session).get_by_normalized_name(normalize_name(name))
         if existing is not None and existing.id != exclude_id:
-            raise ConflictError(f"An investment named '{existing.name}' already exists.")
+            raise ConflictError(tr("An investment named '{0}' already exists.", existing.name))
 
     @staticmethod
     def _require(session: Session, investment_id: int) -> InvestmentModel:
         model = (InvestmentRepository(session).get(investment_id)
                  if is_record_id(investment_id) else None)
         if model is None:
-            raise NotFoundError(f"Investment {investment_id!r} does not exist.")
+            raise NotFoundError(tr("Investment {0!r} does not exist.", investment_id))
         return model
 
     def _require_active(self, session: Session, investment_id: int) -> InvestmentModel:
         model = self._require(session, investment_id)
         if model.is_archived:
-            raise ValidationError(f"'{model.name}' is archived; restore it first.", "investment_id")
+            raise ValidationError(tr("'{0}' is archived; restore it first.", model.name), "investment_id")
         return model

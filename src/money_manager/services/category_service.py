@@ -19,6 +19,7 @@ from money_manager.persistence.repositories import (
     SubscriptionRepository,
     TransactionRepository,
 )
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -78,12 +79,12 @@ class CategoryService:
     def set_investment(self, category_id: int, is_investment: bool) -> Category:
         """Mark an expense category as investing (counted as saving, not spending)."""
         if not isinstance(is_investment, bool):
-            raise ValidationError("Choose yes or no.", "is_investment")
+            raise ValidationError(tr("Choose yes or no."), "is_investment")
         with self._database.session() as session:
             model = _require(CategoryRepository(session), category_id)
             if is_investment and model.kind != CategoryKind.EXPENSE.value:
                 raise ValidationError(
-                    "Only expense categories can be investment categories.", "is_investment"
+                    tr("Only expense categories can be investment categories."), "is_investment"
                 )
             model.is_investment = is_investment
             session.flush()
@@ -98,12 +99,12 @@ class CategoryService:
             model = _require(repository, category_id)
             if TransactionRepository(session).exists_for_category(model.id):
                 raise ConflictError(
-                    f"The category '{model.name}' is used by transactions; archive it instead."
+                    tr("The category '{0}' is used by transactions; archive it instead.", model.name)
                 )
             if SubscriptionRepository(session).exists_for_category(model.id):
                 raise ConflictError(
-                    f"The category '{model.name}' is used by a subscription; change the "
-                    "subscription's category first."
+                    tr("The category '{0}' is used by a subscription; change the subscription's "
+                       "category first.", model.name)
                 )
             repository.delete(model)
         logger.info("Deleted category %s", category_id)
@@ -121,11 +122,11 @@ def _ensure_name_available(
 ) -> None:
     existing = repository.get_by_normalized_name(kind, normalize_name(name))
     if existing is not None and existing.id != exclude_id:
-        raise ConflictError(f"An {kind.value} category named '{existing.name}' already exists.")
+        raise ConflictError(tr("An {0} category named '{1}' already exists.", tr(kind.value), existing.name))
 
 
 def _require(repository: CategoryRepository, category_id: int) -> CategoryModel:
     model = repository.get(category_id) if is_record_id(category_id) else None
     if model is None:
-        raise NotFoundError(f"Category {category_id!r} does not exist.")
+        raise NotFoundError(tr("Category {0!r} does not exist.", category_id))
     return model

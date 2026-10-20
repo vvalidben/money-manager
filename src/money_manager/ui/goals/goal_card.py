@@ -5,6 +5,7 @@ from money_manager.ui.components.card import Card
 from money_manager.ui.components.progress_ring import ProgressRing
 from money_manager.ui.goals.view_model import GoalCardView
 from money_manager.ui.theme import Spacing, identity_color, set_style_property
+from money_manager.core.i18n import tr
 
 
 class GoalCard(Card):
@@ -65,16 +66,16 @@ class GoalCard(Card):
         actions = QHBoxLayout()
         actions.setSpacing(Spacing.SM)
         if view.is_manual:
-            self.primary_button = self._button("Update amount", self.set_amount_requested,
+            self.primary_button = self._button(tr("Update amount"), self.set_amount_requested,
                                                primary=True)
             actions.addWidget(self.primary_button)
         else:
-            self.primary_button = self._button("Add money", self.add_requested, primary=True)
+            self.primary_button = self._button(tr("Add money"), self.add_requested, primary=True)
             actions.addWidget(self.primary_button)
-            actions.addWidget(self._button("Withdraw", self.withdraw_requested))
+            actions.addWidget(self._button(tr("Withdraw"), self.withdraw_requested))
         actions.addStretch(1)
-        actions.addWidget(self._button("Edit", self.edit_requested))
-        self.delete_button = self._button("Delete", self.delete_requested)
+        actions.addWidget(self._button(tr("Edit"), self.edit_requested))
+        self.delete_button = self._button(tr("Delete"), self.delete_requested)
         self.delete_button.setObjectName("DangerButton")
         actions.addWidget(self.delete_button)
         self.body.addStretch(1)

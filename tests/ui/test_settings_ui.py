@@ -268,3 +268,79 @@ class TestCategoryRules:
                             lambda _p, _t, _l, items, *_a, **_k: (items[0], True))
         page.rules_card.add_button.click()
         assert "keyword" in page.rules_card.status_label.text()
+
+
+class TestProtectedBackups:
+    def test_export_and_import_with_a_password(self, page: SettingsPage, data: AppServices,
+                                               tmp_path: Path,
+                                               monkeypatch: pytest.MonkeyPatch) -> None:
+        card = page.data_card
+        target = tmp_path / "backup.mmbackup"
+        filters: list[str] = []
+        monkeypatch.setattr(dialogs, "ask_save_path",
+                            lambda _p, _t, suggested, file_filter: filters.append(file_filter)
+                            or target)
+        answers = iter(["secret pass", "secret pass"])
+        monkeypatch.setattr(card, "ask_password", lambda *_a: next(answers))
+        card.protect_box.setChecked(True)
+        card.export_button.click()
+        assert "protected by your password" in card.status_label.text()
+        assert data.data.is_encrypted(target) and "mmbackup" in filters[0]
+
+        monkeypatch.setattr(dialogs, "ask_open_path", lambda *args: target)
+        monkeypatch.setattr(card, "ask_password", lambda *_a: "secret pass")
+        questions: list[str] = []
+        monkeypatch.setattr(dialogs, "confirm_destructive",
+                            lambda parent, title, message, confirm: questions.append(message)
+                            or False)
+        card.import_button.click()
+        assert "Replace ALL current data" in questions[0]
+
+    def test_mismatched_passwords_export_nothing(self, page: SettingsPage, tmp_path: Path,
+                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+        card = page.data_card
+        answers = iter(["first one!", "second one"])
+        monkeypatch.setattr(card, "ask_password", lambda *_a: next(answers))
+        asked: list[str] = []
+        monkeypatch.setattr(dialogs, "ask_save_path", lambda *a: asked.append("x"))
+        card.protect_box.setChecked(True)
+        card.export_button.click()
+        assert asked == [] and "different" in card.status_label.text()
+
+    def test_wrong_password_is_explained(self, page: SettingsPage, data: AppServices,
+                                         tmp_path: Path,
+                                         monkeypatch: pytest.MonkeyPatch) -> None:
+        target = tmp_path / "b.mmbackup"
+        data.data.export_backup(target, "right password")
+        monkeypatch.setattr(dialogs, "ask_open_path", lambda *args: target)
+        monkeypatch.setattr(page.data_card, "ask_password", lambda *_a: "wrong password")
+        page.data_card.import_button.click()
+        assert "password is wrong" in page.data_card.status_label.text()
+
+
+class TestUpdatesCard:
+    def test_check_now(self, page: SettingsPage, app_services: AppServices,
+                       monkeypatch: pytest.MonkeyPatch) -> None:
+        import json
+
+        from tests.ui.support import wait_until
+
+        card = page.updates_card
+        assert not card.auto_box.isChecked() and card.download_button.isHidden()
+        card.check_button.click()
+        wait_until(lambda: card.check_button.isEnabled())
+        assert card.status_label.text() == "Offline (tests)."
+
+        monkeypatch.setattr(app_services.updates, "_fetch", lambda _url: json.dumps(
+            {"tag_name": "v99.0.0",
+             "html_url": "https://github.com/vvalidben/money-manager/releases/tag/v99.0.0"}
+        ).encode())
+        found: list[str] = []
+        card.update_found.connect(found.append)
+        card.check_button.click()
+        wait_until(lambda: card.check_button.isEnabled())
+        assert "Version 99.0.0 is available" in card.status_label.text()
+        assert card.download_button.isVisibleTo(page) and found == ["99.0.0"]
+
+        card.auto_box.setChecked(True)
+        assert app_services.settings.update_check_enabled()

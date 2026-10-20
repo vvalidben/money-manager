@@ -19,6 +19,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
 
 from money_manager.domain.money import Money, sum_money
+from money_manager.core.i18n import tr
 
 NEAR_LIMIT = Decimal("0.85")
 RATIO_QUANTUM = Decimal("0.0001")
@@ -32,7 +33,7 @@ class BudgetLevel(StrEnum):
 
     @property
     def label(self) -> str:
-        return {"on_track": "On track", "near_limit": "Near limit", "over": "Over"}[self.value]
+        return {"on_track": tr("On track"), "near_limit": tr("Near limit"), "over": tr("Over")}[self.value]
 
 
 @dataclass(frozen=True, slots=True)

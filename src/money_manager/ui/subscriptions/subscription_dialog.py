@@ -35,6 +35,7 @@ from money_manager.ui.goals.goal_dialog import amount_edit
 from money_manager.ui.subscriptions.view_model import FREQUENCY_TEXT
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import to_qdate
+from money_manager.core.i18n import tr
 
 
 class SubscriptionDialog(QDialog):
@@ -51,13 +52,13 @@ class SubscriptionDialog(QDialog):
         self.saved: Subscription | None = None
         today = services.today()
 
-        self.setWindowTitle("Edit subscription" if subscription else "New subscription")
+        self.setWindowTitle(tr("Edit subscription") if subscription else tr("New subscription"))
         self.setModal(True)
         self.setMinimumWidth(500)
 
         self.name_edit = QLineEdit()
         self.name_edit.setMaxLength(MAX_SUBSCRIPTION_NAME_LENGTH)
-        self.name_edit.setPlaceholderText("e.g. Netflix")
+        self.name_edit.setPlaceholderText(tr("e.g. Netflix"))
         self.amount_edit = amount_edit()
         self.frequency_combo = QComboBox()
         for frequency, label in FREQUENCY_TEXT.items():
@@ -70,7 +71,7 @@ class SubscriptionDialog(QDialog):
 
         self.category_combo = QComboBox()
         self.new_category_button = QToolButton()
-        self.new_category_button.setText("New…")
+        self.new_category_button.setText(tr("New…"))
         self.new_category_button.clicked.connect(self._prompt_new_category)
         category_row = QWidget()
         category_layout = QHBoxLayout(category_row)
@@ -79,25 +80,25 @@ class SubscriptionDialog(QDialog):
         category_layout.addWidget(self.new_category_button)
 
         self.account_combo = QComboBox()
-        self.account_combo.addItem("Choose when paying", None)
+        self.account_combo.addItem(tr("Choose when paying"), None)
         for account in services.accounts.list():
             self.account_combo.addItem(account.name, account.id)
 
         self.notes_edit = QPlainTextEdit()
         self.notes_edit.setFixedHeight(56)
-        self.notes_edit.setPlaceholderText("Optional")
-        self.active_check = QCheckBox("Active")
+        self.notes_edit.setPlaceholderText(tr("Optional"))
+        self.active_check = QCheckBox(tr("Active"))
         self.active_check.setChecked(True)
 
         # Keys match the ``field`` names of the service's ValidationError.
         self.fields: dict[str, FormField] = {
-            "name": FormField("Name", self.name_edit),
-            "amount": FormField(f"Amount ({services.base_currency})", self.amount_edit),
-            "frequency": FormField("Frequency", self.frequency_combo),
-            "next_payment_date": FormField("Next payment", self.date_edit),
-            "category_id": FormField("Category", category_row, highlight=self.category_combo),
-            "account_id": FormField("Usually paid from", self.account_combo),
-            "notes": FormField("Notes", self.notes_edit),
+            "name": FormField(tr("Name"), self.name_edit),
+            "amount": FormField(tr("Amount ({0})", services.base_currency), self.amount_edit),
+            "frequency": FormField(tr("Frequency"), self.frequency_combo),
+            "next_payment_date": FormField(tr("Next payment"), self.date_edit),
+            "category_id": FormField(tr("Category"), category_row, highlight=self.category_combo),
+            "account_id": FormField(tr("Usually paid from"), self.account_combo),
+            "notes": FormField(tr("Notes"), self.notes_edit),
         }
         self.form_error = QLabel()
         self.form_error.setObjectName("FormError")
@@ -119,8 +120,8 @@ class SubscriptionDialog(QDialog):
         for field in self.fields.values():
             grid.setAlignment(field, Qt.AlignmentFlag.AlignTop)
 
-        note = QLabel("A subscription is a reminder: payments are only recorded when you confirm "
-                      "them, so your balance never changes on its own.")
+        note = QLabel(tr("A subscription is a reminder: payments are only recorded when you confirm "
+                      "them, so your balance never changes on its own."))
         note.setObjectName("MutedLabel")
         note.setWordWrap(True)
 
@@ -128,7 +129,7 @@ class SubscriptionDialog(QDialog):
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
         save = buttons.button(QDialogButtonBox.StandardButton.Save)
-        save.setText("Save changes" if subscription else "Add subscription")
+        save.setText(tr("Save changes") if subscription else tr("Add subscription"))
         save.setObjectName("PrimaryButton")
         buttons.accepted.connect(self.submit)
         buttons.rejected.connect(self.reject)
@@ -156,7 +157,7 @@ class SubscriptionDialog(QDialog):
         try:
             category = self._services.categories.create(name, CategoryKind.EXPENSE)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not create category", str(exc))
+            dialogs.show_warning(self, tr("Could not create category"), str(exc))
             return
         self._reload_categories(category.id)
 
@@ -175,7 +176,7 @@ class SubscriptionDialog(QDialog):
                 "notes": self.notes_edit.toPlainText(),
             }
             if values["category_id"] is None:
-                raise ValidationError("Choose a category.", "category_id")
+                raise ValidationError(tr("Choose a category."), "category_id")
             if self._original is None:
                 self.saved = service.create(self.name_edit.text(),
                                             is_active=self.active_check.isChecked(), **values)
@@ -212,12 +213,12 @@ class SubscriptionDialog(QDialog):
         for category in self._services.categories.list(CategoryKind.EXPENSE, include_archived=True):
             if not category.is_archived or category.id == select_id:
                 self.category_combo.addItem(category.name, category.id)
-        self.category_combo.setPlaceholderText("No expense categories yet — click New…")
+        self.category_combo.setPlaceholderText(tr("No expense categories yet — click New…"))
         index = self.category_combo.findData(select_id) if select_id is not None else 0
         self.category_combo.setCurrentIndex(index if index >= 0 else 0)
 
     def _prompt_new_category(self) -> None:
-        name, accepted = QInputDialog.getText(self, "New expense category", "Category name:")
+        name, accepted = QInputDialog.getText(self, tr("New expense category"), tr("Category name:"))
         if accepted and name.strip():
             self.create_category(name)
 

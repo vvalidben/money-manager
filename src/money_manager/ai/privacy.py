@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 
 from money_manager.ai.context import NEVER_SENT
 from money_manager.ai.prompts import AIRequest
+from money_manager.core.i18n import tr
 
 _ISSUED_BY_DISCLOSURE = object()
 
@@ -26,7 +27,7 @@ class OnlineConsent:
 
     def __post_init__(self) -> None:
         if self._token is not _ISSUED_BY_DISCLOSURE:
-            raise TypeError("Consent is only given by accepting a DataDisclosure.")
+            raise TypeError(tr("Consent is only given by accepting a DataDisclosure."))
 
     def covers(self, request: AIRequest, destination: str) -> bool:
         return self.payload_digest == request.digest and self.destination == destination
@@ -51,19 +52,18 @@ class DataDisclosure:
     @property
     def title(self) -> str:
         if self.is_online:
-            return f"Send financial information to {self.provider}?"
-        return "Analyse with your local model"
+            return tr("Send financial information to {0}?", self.provider)
+        return tr("Analyse with your local model")
 
     @property
     def warning(self) -> str:
         if not self.is_online:
-            return (f"The summary below is processed by {self.model} running on this computer. "
-                    "Nothing is sent over the internet.")
-        return (f"Financial information about you will be sent over the internet to "
-                f"{self.provider} ({self.destination}) to generate the answer. It leaves this "
-                f"computer and is handled under {self.provider}'s terms and data-retention "
-                "policy. Money Manager sends only the summary shown below, never your "
-                "database.")
+            return (tr("The summary below is processed by {0} running on this computer. Nothing "
+                       "is sent over the internet.", self.model))
+        return (tr("Financial information about you will be sent over the internet to {0} "
+                   "({1}) to generate the answer. It leaves this computer and is handled "
+                   "under {2}'s terms and data-retention policy. Money Manager sends only "
+                   "the summary shown below, never your database.", self.provider, self.destination, self.provider))
 
     def accept(self, now: datetime | None = None) -> OnlineConsent:
         """The user has reviewed this disclosure and agreed to send it."""

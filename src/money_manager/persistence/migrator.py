@@ -123,14 +123,15 @@ def _run(engine: Engine, operation: Callable[[Config], None]) -> None:
         raise DatabaseError(f"The database schema could not be updated: {exc}") from exc
 
 
-def backup_database(engine: Engine, database_path: Path | None, label: str) -> Path | None:
+def backup_database(engine: Engine, database_path: Path | None, label: str,
+                    moment: datetime | None = None) -> Path | None:
     """Consistent copy next to the database (before a schema change, import or reset).
 
-    In-memory databases are skipped.
+    The file name carries ``moment`` (default: now) in UTC. In-memory databases are skipped.
     """
     if database_path is None or not database_path.exists():
         return None
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    stamp = (moment or datetime.now(UTC)).astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
     target = database_path.with_name(f"{database_path.stem}.backup-{label}-{stamp}.db")
     raw = engine.raw_connection()
     destination = sqlite3.connect(target)

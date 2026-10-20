@@ -46,6 +46,7 @@ from money_manager.persistence.repositories import (
     RecurringRepository,
 )
 from money_manager.services.transaction_service import TransactionService
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +175,7 @@ class RecurringService:
                                          Money.from_minor_units(model.amount_minor,
                                                                 self._currency).amount,
                                          due, model.category_id,
-                                         description=model.description, notes=RECURRING_NOTE)
+                                         description=model.description, notes=tr(RECURRING_NOTE))
                 try:
                     self._transactions.create_in_session(session, draft)
                 except ValidationError as exc:  # raised before anything is added
@@ -195,36 +196,35 @@ class RecurringService:
         except ValueError:
             kind = None
         if kind not in RECURRING_TYPES:
-            raise ValidationError("Choose income or expense.", "type")
+            raise ValidationError(tr("Choose income or expense."), "type")
         assert kind is not None
         try:
             clean_frequency = Frequency(frequency)
         except ValueError:
-            raise ValidationError("Choose how often it repeats.", "frequency") from None
+            raise ValidationError(tr("Choose how often it repeats."), "frequency") from None
         if isinstance(first_date, datetime) or not isinstance(first_date, date):
-            raise ValidationError("Enter a valid calendar date.", "first_date")
+            raise ValidationError(tr("Enter a valid calendar date."), "first_date")
         today = self._today()
         if (today - first_date).days > PAST_LIMIT_DAYS:
-            raise ValidationError("The first date cannot be more than a year ago.", "first_date")
+            raise ValidationError(tr("The first date cannot be more than a year ago."), "first_date")
         if first_date.year > today.year + FUTURE_LIMIT_YEARS:
-            raise ValidationError(f"The first date must be within {FUTURE_LIMIT_YEARS} years.",
+            raise ValidationError(tr("The first date must be within {0} years.", FUTURE_LIMIT_YEARS),
                                   "first_date")
         account = AccountRepository(session).get(validate_id(account_id, "account_id"))
         if account is None:
-            raise ValidationError("Choose an account.", "account_id")
+            raise ValidationError(tr("Choose an account."), "account_id")
         if first_date < account.opening_date:
             raise ValidationError(
-                f"The first date cannot be before the account was opened "
-                f"({account.opening_date.isoformat()}).", "first_date")
+                tr("The first date cannot be before the account was opened ({0}).", account.opening_date.isoformat()), "first_date")
         category = CategoryRepository(session).get(validate_id(category_id, "category_id"))
         if category is None:
-            raise ValidationError("Choose a category.", "category_id")
+            raise ValidationError(tr("Choose a category."), "category_id")
         wanted = CategoryKind.INCOME if kind is TransactionType.INCOME else CategoryKind.EXPENSE
         if category.kind != wanted.value:
-            raise ValidationError(f"'{category.name}' is not an {wanted.value} category.",
+            raise ValidationError(tr("'{0}' is not an {1} category.", category.name, tr(wanted.value)),
                                   "category_id")
         if category.is_archived and category.id != keep_category_id:
-            raise ValidationError(f"The category '{category.name}' is archived.", "category_id")
+            raise ValidationError(tr("The category '{0}' is archived.", category.name), "category_id")
         return _Valid(text, kind, Money(positive_amount(amount), self._currency), account.id,
                       category.id, clean_frequency, first_date)
 
@@ -232,7 +232,7 @@ class RecurringService:
     def _require(session: Session, entry_id: int) -> RecurringEntryModel:
         model = RecurringRepository(session).get(validate_id(entry_id, "entry_id"))
         if model is None:
-            raise NotFoundError(f"Recurring entry {entry_id!r} does not exist.")
+            raise NotFoundError(tr("Recurring entry {0!r} does not exist.", entry_id))
         return model
 
     def _to_domain(self, model: RecurringEntryModel) -> RecurringEntry:

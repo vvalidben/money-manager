@@ -22,32 +22,35 @@ from money_manager.domain.recurring import RecordOutcome, RecurringEntry
 from money_manager.domain.subscriptions import Frequency
 from money_manager.services import AppServices
 from money_manager.ui import dialogs
-from money_manager.ui.formatting import format_date, format_signed_money
+from money_manager.ui.formatting import format_date, format_signed_money, month_abbreviation
 from money_manager.ui.recurring.entry_dialog import RecurringEntryDialog
 from money_manager.ui.theme import Spacing
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
-COLUMNS = ["Description", "Amount", "Repeats", "Next date", "Account", "Status"]
+WEEKDAYS = ("Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays",
+            "Sundays")  # shown through tr()
+COLUMNS = [tr("Description"), tr("Amount"), tr("Repeats"), tr("Next date"), tr("Account"), tr("Status")]
 
 
 def repeats_text(entry: RecurringEntry) -> str:
     day = entry.anchor_day
     return {
-        Frequency.WEEKLY: f"Weekly ({entry.next_date:%A}s)",
-        Frequency.MONTHLY: f"Monthly, day {day}",
-        Frequency.QUARTERLY: f"Every 3 months, day {day}",
-        Frequency.YEARLY: f"Yearly, {entry.next_date:%d %b}",
+        Frequency.WEEKLY: tr("Weekly, on {0}", tr(WEEKDAYS[entry.next_date.weekday()])),
+        Frequency.MONTHLY: tr("Monthly, day {0}", day),
+        Frequency.QUARTERLY: tr("Every 3 months, day {0}", day),
+        Frequency.YEARLY: tr("Yearly, {0}",
+                             f"{entry.next_date.day:02d} {month_abbreviation(entry.next_date)}"),
     }[entry.frequency]
 
 
 def outcome_text(outcome: RecordOutcome) -> str:
     parts = []
     if outcome.recorded:
-        parts.append(f"{outcome.recorded} recorded" if outcome.recorded != 1 else "1 recorded")
+        parts.append(f"{outcome.recorded} recorded" if outcome.recorded != 1 else tr("1 recorded"))
     for problem in outcome.problems:
-        parts.append(f"“{problem.description}” on {format_date(problem.due)} could not be "
-                     f"recorded: {problem.message}")
+        parts.append(tr("“{0}” on {1} could not be recorded: {2}", problem.description, format_date(problem.due), problem.message))
     return " · ".join(parts)
 
 
@@ -57,13 +60,13 @@ class RecurringDialog(QDialog):
         self._services = services
         self.changed = False  # entries were added, changed or recorded
         self.entries: list[RecurringEntry] = []
-        self.setWindowTitle("Recurring entries")
+        self.setWindowTitle(tr("Recurring entries"))
         self.setModal(True)
         self.resize(820, 460)
 
-        intro = QLabel("Income and expenses that repeat — salary, rent, savings — are recorded "
+        intro = QLabel(tr("Income and expenses that repeat — salary, rent, savings — are recorded "
                        "automatically on each date. Subscriptions you confirm one by one stay on "
-                       "the Subscriptions page.")
+                       "the Subscriptions page."))
         intro.setObjectName("MutedLabel")
         intro.setWordWrap(True)
         self.table = QTableWidget(0, len(COLUMNS))
@@ -79,21 +82,21 @@ class RecurringDialog(QDialog):
             header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         self.table.itemSelectionChanged.connect(self._update_buttons)
         self.table.doubleClicked.connect(lambda _index: self.edit_selected())
-        self.empty_label = QLabel("No recurring entries yet. Add your salary or rent to have "
-                                  "them recorded for you.")
+        self.empty_label = QLabel(tr("No recurring entries yet. Add your salary or rent to have "
+                                  "them recorded for you."))
         self.empty_label.setObjectName("MutedLabel")
         self.status_label = QLabel()
         self.status_label.setObjectName("MutedLabel")
         self.status_label.setWordWrap(True)
 
-        self.add_button = QPushButton("Add…")
+        self.add_button = QPushButton(tr("Add…"))
         self.add_button.setObjectName("PrimaryButton")
         self.add_button.clicked.connect(self.add)
-        self.edit_button = QPushButton("Edit…")
+        self.edit_button = QPushButton(tr("Edit…"))
         self.edit_button.clicked.connect(self.edit_selected)
-        self.pause_button = QPushButton("Pause")
+        self.pause_button = QPushButton(tr("Pause"))
         self.pause_button.clicked.connect(self.toggle_selected)
-        self.delete_button = QPushButton("Delete")
+        self.delete_button = QPushButton(tr("Delete"))
         self.delete_button.setObjectName("DangerButton")
         self.delete_button.clicked.connect(self.delete_selected)
         actions = QHBoxLayout()
@@ -126,7 +129,7 @@ class RecurringDialog(QDialog):
             signed = entry.amount if entry.type is TransactionType.INCOME else -entry.amount
             cells = [entry.description, format_signed_money(signed), repeats_text(entry),
                      format_date(entry.next_date), accounts.get(entry.account_id, "?"),
-                     "Active" if entry.is_active else "Paused"]
+                     tr("Active") if entry.is_active else tr("Paused")]
             for column, text in enumerate(cells):
                 self.table.setItem(row, column, QTableWidgetItem(text))
         self.table.setVisible(bool(self.entries))
@@ -141,12 +144,12 @@ class RecurringDialog(QDialog):
         entry = self.selected()
         for button in (self.edit_button, self.pause_button, self.delete_button):
             button.setEnabled(entry is not None)
-        self.pause_button.setText("Resume" if entry is not None and not entry.is_active
-                                  else "Pause")
+        self.pause_button.setText(tr("Resume") if entry is not None and not entry.is_active
+                                  else tr("Pause"))
 
     def add(self) -> None:
         if not self._services.accounts.list():
-            dialogs.show_info(self, "Recurring entries", "Create an account first.")
+            dialogs.show_info(self, tr("Recurring entries"), tr("Create an account first."))
             return
         self._edit(None)
 
@@ -181,8 +184,8 @@ class RecurringDialog(QDialog):
     def delete_selected(self) -> None:
         entry = self.selected()
         if entry is None or not dialogs.confirm_destructive(
-                self, "Delete recurring entry",
-                f"Stop recording “{entry.description}”? Entries already recorded are kept."):
+                self, tr("Delete recurring entry"),
+                tr("Stop recording “{0}”? Entries already recorded are kept.", entry.description)):
             return
         try:
             self._services.recurring.delete(entry.id)
@@ -200,5 +203,5 @@ class RecurringDialog(QDialog):
             self.status_label.setText(str(exc))
             return
         text = outcome_text(outcome)
-        self.status_label.setText(f"Recorded now: {text}." if outcome.recorded
+        self.status_label.setText(tr("Recorded now: {0}.", text) if outcome.recorded
                                   else text)

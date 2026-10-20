@@ -12,6 +12,7 @@ from money_manager.persistence.database import Database
 from money_manager.persistence.mappers import account_to_domain
 from money_manager.persistence.models import AccountModel
 from money_manager.persistence.repositories import AccountRepository, TransactionRepository
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +88,7 @@ class AccountService:
             first_transaction = TransactionRepository(session).earliest_date(model.id)
             if first_transaction is not None and valid.opening_date > first_transaction:
                 raise ValidationError(
-                    "The opening date cannot be after the account's first transaction "
-                    f"({first_transaction.isoformat()}).",
+                    tr("The opening date cannot be after the account's first transaction ({0}).", first_transaction.isoformat()),
                     "opening_date",
                 )
 
@@ -108,7 +108,7 @@ class AccountService:
             model = _require(repository, account_id)
             if TransactionRepository(session).exists_for_account(model.id):
                 raise ConflictError(
-                    f"The account '{model.name}' has transactions and cannot be deleted."
+                    tr("The account '{0}' has transactions and cannot be deleted.", model.name)
                 )
             repository.delete(model)
         logger.info("Deleted account %s", account_id)
@@ -119,11 +119,11 @@ class AccountService:
     ) -> None:
         existing = repository.get_by_normalized_name(normalize_name(name))
         if existing is not None and existing.id != exclude_id:
-            raise ConflictError(f"An account named '{existing.name}' already exists.")
+            raise ConflictError(tr("An account named '{0}' already exists.", existing.name))
 
 
 def _require(repository: AccountRepository, account_id: int) -> AccountModel:
     model = repository.get(account_id) if is_record_id(account_id) else None
     if model is None:
-        raise NotFoundError(f"Account {account_id!r} does not exist.")
+        raise NotFoundError(tr("Account {0!r} does not exist.", account_id))
     return model

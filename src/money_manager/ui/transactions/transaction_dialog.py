@@ -34,6 +34,7 @@ from money_manager.ui.components import FormField
 from money_manager.ui.formatting import type_label
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import to_qdate
+from money_manager.core.i18n import tr
 
 # Digits, grouping spaces and at most one decimal separator with two decimals.
 AMOUNT_INPUT_PATTERN = r"[0-9   ]*([.,][0-9]{0,2})?"
@@ -52,7 +53,7 @@ class TransactionDialog(QDialog):
         self._original = transaction
         self.saved: Transaction | None = None
 
-        self.setWindowTitle("Edit transaction" if transaction else "Add transaction")
+        self.setWindowTitle(tr("Edit transaction") if transaction else tr("Add transaction"))
         self.setModal(True)
         self.setMinimumWidth(520)
 
@@ -79,7 +80,7 @@ class TransactionDialog(QDialog):
 
         self.category_combo = QComboBox()
         self.new_category_button = QToolButton()
-        self.new_category_button.setText("New…")
+        self.new_category_button.setText(tr("New…"))
         self.new_category_button.clicked.connect(self._prompt_new_category)
         category_row = side_by_side(self.category_combo, self.new_category_button,
                                     stretch_first=True)
@@ -97,22 +98,22 @@ class TransactionDialog(QDialog):
 
         self.description_edit = QLineEdit()
         self.description_edit.setMaxLength(MAX_DESCRIPTION_LENGTH)
-        self.description_edit.setPlaceholderText("e.g. Groceries at Marjane")
+        self.description_edit.setPlaceholderText(tr("e.g. Groceries at Marjane"))
 
         self.notes_edit = QPlainTextEdit()
         self.notes_edit.setFixedHeight(64)
-        self.notes_edit.setPlaceholderText("Optional")
+        self.notes_edit.setPlaceholderText(tr("Optional"))
 
         # Keys match the ``field`` names used by the service's ValidationError.
         self.fields: dict[str, FormField] = {
-            "type": FormField("Type", self.type_combo),
-            "amount": FormField("Amount", amount_row, highlight=self.amount_edit),
-            "category_id": FormField("Category", category_row, highlight=self.category_combo),
-            "occurred_on": FormField("Date", self.date_edit),
-            "account_id": FormField("Account", self.account_combo),
-            "allocation_id": FormField("Paid from", self.allocation_combo),
-            "description": FormField("Description", self.description_edit),
-            "notes": FormField("Notes", self.notes_edit),
+            "type": FormField(tr("Type"), self.type_combo),
+            "amount": FormField(tr("Amount"), amount_row, highlight=self.amount_edit),
+            "category_id": FormField(tr("Category"), category_row, highlight=self.category_combo),
+            "occurred_on": FormField(tr("Date"), self.date_edit),
+            "account_id": FormField(tr("Account"), self.account_combo),
+            "allocation_id": FormField(tr("Paid from"), self.allocation_combo),
+            "description": FormField(tr("Description"), self.description_edit),
+            "notes": FormField(tr("Notes"), self.notes_edit),
         }
         self.fields["account_id"].setVisible(len(self._accounts) > 1)
 
@@ -125,7 +126,7 @@ class TransactionDialog(QDialog):
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
         self.save_button = self.buttons.button(QDialogButtonBox.StandardButton.Save)
-        self.save_button.setText("Save changes" if transaction else "Add transaction")
+        self.save_button.setText(tr("Save changes") if transaction else tr("Add transaction"))
         self.save_button.setObjectName("PrimaryButton")
         self.save_button.setDefault(True)
         self.buttons.accepted.connect(self.submit)
@@ -221,7 +222,7 @@ class TransactionDialog(QDialog):
         try:
             category = self._services.categories.create(name, kind)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not create category", str(exc))
+            dialogs.show_warning(self, tr("Could not create category"), str(exc))
             return None
         self._categories.append(category)
         self._reload_categories(select_id=category.id)
@@ -255,7 +256,7 @@ class TransactionDialog(QDialog):
         self.fields["category_id"].setVisible(needs_category)
         self.fields["allocation_id"].setVisible(not transaction_type.is_adjustment)
         self.fields["allocation_id"].label.setText(
-            "Put into" if transaction_type.sign > 0 else "Paid from"
+            tr("Put into") if transaction_type.sign > 0 else tr("Paid from")
         )
         if needs_category:
             self._reload_categories()
@@ -277,7 +278,7 @@ class TransactionDialog(QDialog):
             if category.kind is kind and (not category.is_archived or category.id == original_id):
                 self.category_combo.addItem(category.name, category.id)
         self.category_combo.setPlaceholderText(
-            f"No {kind.value} categories yet — click New…" if kind else ""
+            tr("No {0} categories yet — click New…", tr(kind.value)) if kind else ""
         )
         self.category_combo.setCurrentIndex(self.category_combo.findData(keep_id) if keep_id else 0)
         if self.category_combo.currentIndex() < 0 and self.category_combo.count():
@@ -289,7 +290,7 @@ class TransactionDialog(QDialog):
         original_id = self._original.allocation_id if self._original else None
         self.allocation_combo.blockSignals(True)
         self.allocation_combo.clear()
-        self.allocation_combo.addItem("Available (not allocated)", None)
+        self.allocation_combo.addItem(tr("Available (not allocated)"), None)
         for allocation in self._services.allocations.list(include_archived=True):
             if not allocation.is_archived or allocation.id == original_id:
                 self.allocation_combo.addItem(allocation.name, allocation.id)
@@ -301,7 +302,7 @@ class TransactionDialog(QDialog):
         if kind is None:
             return
         name, accepted = QInputDialog.getText(
-            self, f"New {kind.value} category", "Category name:"
+            self, tr("New {0} category", tr(kind.value)), tr("Category name:")
         )
         if accepted and name.strip():
             self.create_category(name)

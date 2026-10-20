@@ -28,6 +28,7 @@ from money_manager.persistence.repositories import (
     TransactionRepository,
 )
 from money_manager.services.transaction_service import TransactionService
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -45,23 +46,23 @@ class AccountTransferService:
         source_id = validate_id(from_account_id, "from_account_id")
         target_id = validate_id(to_account_id, "to_account_id")
         if source_id == target_id:
-            raise ValidationError("Choose two different accounts.", "to_account_id")
+            raise ValidationError(tr("Choose two different accounts."), "to_account_id")
         with self._database.session() as session:
             accounts = AccountRepository(session)
             source, target = accounts.get(source_id), accounts.get(target_id)
             if source is None:
-                raise ValidationError("The account to transfer from does not exist.",
+                raise ValidationError(tr("The account to transfer from does not exist."),
                                       "from_account_id")
             if target is None:
-                raise ValidationError("The account to transfer to does not exist.",
+                raise ValidationError(tr("The account to transfer to does not exist."),
                                       "to_account_id")
             note = description.strip() if isinstance(description, str) else ""
             out = self._transactions.create_in_session(session, TransactionDraft(
                 source_id, TransactionType.ADJUSTMENT_OUT, amount, occurred_on,
-                description=note or f"Transfer to {target.name}"))
+                description=note or tr("Transfer to {0}", target.name)))
             into = self._transactions.create_in_session(session, TransactionDraft(
                 target_id, TransactionType.ADJUSTMENT_IN, amount, occurred_on,
-                description=note or f"Transfer from {source.name}"))
+                description=note or tr("Transfer from {0}", source.name)))
             model = AccountTransferRepository(session).add(
                 AccountTransferModel(out_transaction_id=out.id, in_transaction_id=into.id))
             transfer = _to_domain(session, model)
@@ -107,7 +108,7 @@ class AccountTransferService:
 def _require(session: Session, transfer_id: int) -> AccountTransferModel:
     model = AccountTransferRepository(session).get(validate_id(transfer_id, "transfer_id"))
     if model is None:
-        raise NotFoundError(f"Transfer {transfer_id!r} does not exist.")
+        raise NotFoundError(tr("Transfer {0!r} does not exist.", transfer_id))
     return model
 
 

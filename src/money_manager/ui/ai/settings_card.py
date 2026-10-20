@@ -29,30 +29,32 @@ from money_manager.core.errors import MoneyManagerError, ValidationError
 from money_manager.services import AppServices
 from money_manager.ui.components import Card, FormField, compact_combo
 from money_manager.ui.theme import Spacing, set_style_property
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
 FORM_MAX_WIDTH = 640
 
 INTRO_TEXT = (
-    "AI features are optional and off unless you choose a provider. They receive a summary "
+    tr("AI features are optional and off unless you choose a provider. They receive a summary "
     "calculated by Money Manager, never your database, transaction descriptions or account "
-    "names."
+    "names.")
 )
-LOCAL_NOTE = "Runs on this computer with Ollama. Nothing is sent over the internet."
+LOCAL_NOTE = tr("Runs on this computer with Ollama. Nothing is sent over the internet.")
 ONLINE_NOTICE = (
-    f"Online AI sends a summary of your finances to Anthropic ({API_HOST}). Before every "
-    "request you will see exactly what would be sent, and nothing is sent unless you confirm."
+    tr("Online AI sends a summary of your finances to Anthropic ({0}). Before "
+       "every request you will see exactly what would be sent, and nothing is "
+       "sent unless you confirm.", API_HOST)
 )
 AUTO_NOTE = (
-    "Automatic uses the local model when Ollama is running with it, and otherwise the online "
-    "provider. Online requests still show what would be sent and wait for your confirmation."
+    tr("Automatic uses the local model when Ollama is running with it, and otherwise the online "
+    "provider. Online requests still show what would be sent and wait for your confirmation.")
 )
 
 
 class AISettingsCard(Card):
     def __init__(self, services: AppServices, parent: QWidget | None = None) -> None:
-        super().__init__("AI assistant", parent)
+        super().__init__(tr("AI assistant"), parent)
         self._ai = services.ai
 
         intro = QLabel(INTRO_TEXT)
@@ -61,7 +63,7 @@ class AISettingsCard(Card):
 
         self.mode_combo = QComboBox()
         for mode, label in MODE_LABELS.items():
-            self.mode_combo.addItem(label, mode.value)
+            self.mode_combo.addItem(tr(label), mode.value)
         self.mode_combo.currentIndexChanged.connect(self._update_sections)
         compact_combo(self.mode_combo, 18)
 
@@ -70,9 +72,9 @@ class AISettingsCard(Card):
         self.local_url_edit.setPlaceholderText("http://localhost:11434")
         self.local_model_combo = QComboBox()
         self.local_model_combo.setEditable(True)
-        self.local_model_combo.setPlaceholderText("e.g. llama3.2")
+        self.local_model_combo.setPlaceholderText(tr("e.g. llama3.2"))
         compact_combo(self.local_model_combo, 14)
-        self.find_models_button = QPushButton("Find installed models")
+        self.find_models_button = QPushButton(tr("Find installed models"))
         self.find_models_button.clicked.connect(self.find_models)
         model_row = QWidget()
         model_layout = QHBoxLayout(model_row)
@@ -93,10 +95,10 @@ class AISettingsCard(Card):
         self.key_status_label.setWordWrap(True)
         self.key_edit = QLineEdit()
         self.key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.key_edit.setPlaceholderText("Paste an Anthropic API key")
-        self.save_key_button = QPushButton("Save key")
+        self.key_edit.setPlaceholderText(tr("Paste an Anthropic API key"))
+        self.save_key_button = QPushButton(tr("Save key"))
         self.save_key_button.clicked.connect(self.save_key)
-        self.remove_key_button = QPushButton("Remove key")
+        self.remove_key_button = QPushButton(tr("Remove key"))
         self.remove_key_button.clicked.connect(self.remove_key)
         key_row = QWidget()
         key_layout = QHBoxLayout(key_row)
@@ -113,12 +115,12 @@ class AISettingsCard(Card):
 
         # Keys match the ``field`` names of the service's ValidationError.
         self.fields: dict[str, FormField] = {
-            "mode": FormField("Provider", self.mode_combo),
-            "local_url": FormField("Ollama address", self.local_url_edit),
-            "local_model": FormField("Local model", model_row, highlight=self.local_model_combo),
-            "online_model": FormField("Claude model", self.online_model_edit),
-            "api_key": FormField("API key", key_row, highlight=self.key_edit),
-            "timeout_seconds": FormField("Timeout", self.timeout_spin),
+            "mode": FormField(tr("Provider"), self.mode_combo),
+            "local_url": FormField(tr("Ollama address"), self.local_url_edit),
+            "local_model": FormField(tr("Local model"), model_row, highlight=self.local_model_combo),
+            "online_model": FormField(tr("Claude model"), self.online_model_edit),
+            "api_key": FormField(tr("API key"), key_row, highlight=self.key_edit),
+            "timeout_seconds": FormField(tr("Timeout"), self.timeout_spin),
         }
 
         for field in self.fields.values():
@@ -130,11 +132,11 @@ class AISettingsCard(Card):
         self.online_section = self._section(self.online_notice, self.fields["online_model"],
                                             self.fields["api_key"], self.key_status_label)
 
-        self.save_button = QPushButton("Save AI settings")
+        self.save_button = QPushButton(tr("Save AI settings"))
         self.save_button.setObjectName("PrimaryButton")
         self.save_button.clicked.connect(self.save)
-        self.test_button = QPushButton("Test connection")
-        self.test_button.setToolTip("Checks the provider without sending any financial data.")
+        self.test_button = QPushButton(tr("Test connection"))
+        self.test_button.setToolTip(tr("Checks the provider without sending any financial data."))
         self.test_button.clicked.connect(self.test_connection)
         buttons = QHBoxLayout()
         buttons.addWidget(self.save_button)
@@ -216,14 +218,14 @@ class AISettingsCard(Card):
             self._show_status(str(exc), error=True)
             return False
         self.local_url_edit.setText(saved.local_url)
-        self._show_status("AI settings saved." if saved.mode is not AIMode.OFF
-                          else "AI features are off.")
+        self._show_status(tr("AI settings saved.") if saved.mode is not AIMode.OFF
+                          else tr("AI features are off."))
         return True
 
     def test_connection(self) -> None:
         """Contacts the provider (no financial data) with the settings as shown."""
         self._clear_errors()
-        self._show_status("Checking…")
+        self._show_status(tr("Checking…"))
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             status = self._ai.check_availability(self.current_settings(), probe=True)
@@ -255,7 +257,7 @@ class AISettingsCard(Card):
         finally:
             self.key_edit.clear()  # the key is never displayed again
         self._show_key_status(status)
-        self._show_status(f"API key saved in {self._ai.key_location}.")
+        self._show_status(tr("API key saved in {0}.", self._ai.key_location))
 
     def remove_key(self) -> None:
         self._clear_errors()
@@ -265,7 +267,7 @@ class AISettingsCard(Card):
             self._show_status(str(exc), error=True)
             return
         self._show_key_status(status)
-        self._show_status("Stored API key removed.")
+        self._show_status(tr("Stored API key removed."))
 
     # -------------------------------------------------------------- helpers
 
@@ -278,12 +280,11 @@ class AISettingsCard(Card):
     def _show_key_status(self, status: KeyStatus) -> None:
         match status.source:
             case KeySource.STORED:
-                text = f"A key ending in {status.hint} is stored in {self._ai.key_location}."
+                text = tr("A key ending in {0} is stored in {1}.", status.hint, self._ai.key_location)
             case KeySource.ENVIRONMENT:
-                text = f"Using the key ending in {status.hint} from {ANTHROPIC_KEY_ENV}."
+                text = tr("Using the key ending in {0} from {1}.", status.hint, ANTHROPIC_KEY_ENV)
             case _:
-                text = (f"No API key yet. Keys are kept in {self._ai.key_location}, "
-                        "never in the database.")
+                text = (tr("No API key yet. Keys are kept in {0}, never in the database.", self._ai.key_location))
         self.key_status_label.setText(text)
         self.remove_key_button.setEnabled(status.source is KeySource.STORED)
 

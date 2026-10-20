@@ -144,6 +144,7 @@ class PortfolioSummary:
     positions: tuple[InvestmentPosition, ...]  # active investments
     total_balance: Money  # real balance of the accounts, for net worth
     currency: str
+    debts: Money | None = None  # owed to you − you owe
 
     @property
     def contributed(self) -> Money:
@@ -189,8 +190,9 @@ class PortfolioSummary:
 
     @property
     def net_worth(self) -> Money:
-        """Account balance plus known investment values (these never overlap)."""
-        return self.total_balance + self.total_value
+        """Account balance plus known investment values plus loans (never overlapping)."""
+        loans = self.debts if self.debts is not None else Money.zero(self.currency)
+        return self.total_balance + self.total_value + loans
 
     @property
     def by_kind(self) -> tuple[KindShare, ...]:
@@ -217,7 +219,12 @@ class NetWorthPoint:
     on: date  # the day measured: the month's last day, or today for the current month
     balance: Money  # all accounts
     investments: Money  # latest known values of the active investments on that day
+    debts: Money | None = None  # owed to you − you owe (see ``domain.debts``)
+
+    @property
+    def loans(self) -> Money:
+        return self.debts if self.debts is not None else Money.zero(self.balance.currency)
 
     @property
     def net_worth(self) -> Money:
-        return self.balance + self.investments
+        return self.balance + self.investments + self.loans

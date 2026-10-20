@@ -15,6 +15,7 @@ import logging
 import sys
 from enum import Enum
 from typing import Protocol
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +33,10 @@ class HelloStatus(Enum):
     @property
     def explanation(self) -> str:
         return {
-            "available": "Windows Hello is ready.",
-            "not_set_up": "Windows Hello is not set up for your account. Add a PIN, fingerprint "
-                          "or face in Windows Settings → Accounts → Sign-in options.",
-            "unsupported": "Windows Hello is not available on this computer.",
+            "available": tr("Windows Hello is ready."),
+            "not_set_up": tr("Windows Hello is not set up for your account. Add a PIN, fingerprint "
+                          "or face in Windows Settings → Accounts → Sign-in options."),
+            "unsupported": tr("Windows Hello is not available on this computer."),
         }[self.value]
 
 

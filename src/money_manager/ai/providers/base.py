@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from money_manager.ai.privacy import OnlineConsent
 from money_manager.ai.prompts import AIRequest, AIResponse
 from money_manager.core.errors import AIError, AIResponseError, ConsentRequiredError
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ class AIProvider(ABC):
         except Exception as exc:
             logger.error("Unexpected failure in the %s provider (%s)", self.name,
                          type(exc).__name__)
-            raise AIResponseError(f"{self.name} failed unexpectedly. Please try again.") from exc
+            raise AIResponseError(tr("{0} failed unexpectedly. Please try again.", self.name)) from exc
         logger.info("AI answer from %s in %.1f s (%d characters)", self.name,
                     time.monotonic() - started, len(response.text))
         return response
@@ -87,10 +88,10 @@ class AIProvider(ABC):
             return
         if consent is None:
             raise ConsentRequiredError(
-                f"Sending financial information to {self.name} needs your confirmation first.")
+                tr("Sending financial information to {0} needs your confirmation first.", self.name))
         if not consent.covers(request, self.destination):
             raise ConsentRequiredError(
-                "The information to send changed after you agreed. Review it and confirm again.")
+                tr("The information to send changed after you agreed. Review it and confirm again."))
 
 
 class LocalAIProvider(AIProvider, ABC):
@@ -100,7 +101,7 @@ class LocalAIProvider(AIProvider, ABC):
 
     @property
     def destination(self) -> str:
-        return "this computer"
+        return tr("this computer")
 
 
 class OnlineAIProvider(AIProvider, ABC):

@@ -93,3 +93,32 @@ def hello_verifier(monkeypatch: pytest.MonkeyPatch) -> FakeVerifier:
     fake = FakeVerifier()
     monkeypatch.setattr(hello, "default_verifier", lambda: fake)
     return fake
+
+
+@pytest.fixture(autouse=True)
+def _no_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The update check never goes online in tests."""
+    from money_manager.services import update_service
+
+    def offline(_url: str) -> bytes:
+        raise update_service.UpdateCheckError("Offline (tests).")
+
+    monkeypatch.setattr(update_service, "fetch_url", offline)
+
+
+@pytest.fixture(autouse=True)
+def _never_launch_processes(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Tests must never restart or launch Money Manager: a launched copy would open the
+    real data folder (it does not inherit the test's temporary configuration)."""
+    from PySide6.QtCore import QProcess
+
+    from money_manager.ui.settings import cards
+
+    restarts: list[str] = []
+    monkeypatch.setattr(cards, "restart_application", lambda: restarts.append("restart"))
+
+    def refuse(*_args: object, **_kwargs: object) -> bool:
+        raise AssertionError("A test tried to launch a process")
+
+    monkeypatch.setattr(QProcess, "startDetached", staticmethod(refuse))
+    return restarts

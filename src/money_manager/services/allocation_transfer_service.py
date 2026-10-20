@@ -22,6 +22,7 @@ from money_manager.persistence.repositories import (
     AllocationTransferRepository,
 )
 from money_manager.services.allocation_ledger import AllocationLedger
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class AllocationTransferService:
             destination = _load(session, model.to_allocation_id, "to_allocation_id")
             if source is not None and source.is_archived:
                 raise ConflictError(
-                    f"The allocation '{source.name}' is archived; restore it before undoing."
+                    tr("The allocation '{0}' is archived; restore it before undoing.", source.name)
                 )
             amount = transfer_to_domain(model, self._currency).amount
             AllocationLedger(session, self._currency).require_funds(destination, amount)
@@ -136,12 +137,12 @@ def _load(session: Session, allocation_id: int | None, field: str) -> Allocation
         return None
     model = AllocationRepository(session).get(validate_id(allocation_id, field))
     if model is None:
-        raise ValidationError("The selected allocation does not exist.", field)
+        raise ValidationError(tr("The selected allocation does not exist."), field)
     return allocation_to_domain(model)
 
 
 def _require(repository: AllocationTransferRepository, transfer_id: int) -> AllocationTransferModel:
     model = repository.get(transfer_id) if is_record_id(transfer_id) else None
     if model is None:
-        raise NotFoundError(f"Transfer {transfer_id!r} does not exist.")
+        raise NotFoundError(tr("Transfer {0!r} does not exist.", transfer_id))
     return model

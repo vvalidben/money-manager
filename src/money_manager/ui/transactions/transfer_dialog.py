@@ -27,6 +27,7 @@ from money_manager.ui.components import FormField
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.filter_bar import to_qdate
 from money_manager.ui.transactions.transaction_dialog import AMOUNT_INPUT_PATTERN, side_by_side
+from money_manager.core.i18n import tr
 
 
 class TransferDialog(QDialog):
@@ -34,7 +35,7 @@ class TransferDialog(QDialog):
         super().__init__(parent)
         self._services = services
         self.saved: AccountTransfer | None = None
-        self.setWindowTitle("Transfer between accounts")
+        self.setWindowTitle(tr("Transfer between accounts"))
         self.setModal(True)
         self.setMinimumWidth(480)
 
@@ -62,18 +63,18 @@ class TransferDialog(QDialog):
 
         self.description_edit = QLineEdit()
         self.description_edit.setMaxLength(MAX_DESCRIPTION_LENGTH)
-        self.description_edit.setPlaceholderText("Optional, e.g. Cash for the market")
+        self.description_edit.setPlaceholderText(tr("Optional, e.g. Cash for the market"))
 
         self.fields: dict[str, FormField] = {
-            "from_account_id": FormField("From", self.from_combo),
-            "to_account_id": FormField("To", self.to_combo),
-            "amount": FormField("Amount", side_by_side(self.amount_edit, currency),
+            "from_account_id": FormField(tr("From"), self.from_combo),
+            "to_account_id": FormField(tr("To"), self.to_combo),
+            "amount": FormField(tr("Amount"), side_by_side(self.amount_edit, currency),
                                 highlight=self.amount_edit),
-            "occurred_on": FormField("Date", self.date_edit),
-            "description": FormField("Description", self.description_edit),
+            "occurred_on": FormField(tr("Date"), self.date_edit),
+            "description": FormField(tr("Description"), self.description_edit),
         }
-        note = QLabel("Moves money between your own accounts. Your total stays the same, and a "
-                      "transfer never counts as income or spending.")
+        note = QLabel(tr("Moves money between your own accounts. Your total stays the same, and a "
+                      "transfer never counts as income or spending."))
         note.setObjectName("MutedLabel")
         note.setWordWrap(True)
 
@@ -85,7 +86,7 @@ class TransferDialog(QDialog):
         self.buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         self.save_button = self.buttons.button(QDialogButtonBox.StandardButton.Save)
-        self.save_button.setText("Transfer")
+        self.save_button.setText(tr("Transfer"))
         self.save_button.setObjectName("PrimaryButton")
         self.save_button.setDefault(True)
         self.buttons.accepted.connect(self.submit)

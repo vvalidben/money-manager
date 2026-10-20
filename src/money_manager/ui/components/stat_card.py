@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QLabel, QWidget
 from money_manager.ui import motion
 from money_manager.ui.components.card import Card
 from money_manager.ui.theme import FILL_COLORS, FontSize, Spacing, mono_font, set_style_property
+from money_manager.core.i18n import tr
 
 Tone = Literal["neutral", "inflow", "outflow"]
 
@@ -103,7 +104,7 @@ class StatCard(Card):
     def set_fill(self, fill: str | None) -> None:
         """Fill the tile with a named page colour (see ``theme.FILL_COLORS``), or clear it."""
         if fill is not None and fill not in FILL_COLORS:
-            raise ValueError(f"Unknown fill colour: {fill!r}")
+            raise ValueError(tr("Unknown fill colour: {0!r}", fill))
         self.fill = fill
         set_style_property(self, "fill", fill or "")
         for label in (self.label, self.value_label, self.caption_label):

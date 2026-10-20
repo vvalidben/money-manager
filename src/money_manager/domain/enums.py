@@ -3,6 +3,7 @@
 from enum import StrEnum
 
 from money_manager.core.errors import ValidationError
+from money_manager.core.i18n import tr
 
 
 class CategoryKind(StrEnum):
@@ -38,7 +39,7 @@ class TransactionType(StrEnum):
 
     @property
     def label(self) -> str:
-        return _LABELS[self]
+        return tr(_LABELS[self])
 
 
 class TransactionSort(StrEnum):
@@ -71,7 +72,7 @@ def parse_transaction_type(value: object) -> TransactionType:
         except ValueError:
             pass
     allowed = ", ".join(t.value for t in TransactionType)
-    raise ValidationError(f"Invalid transaction type {value!r}; expected one of: {allowed}.", "type")
+    raise ValidationError(tr("Invalid transaction type {0!r}; expected one of: {1}.", value, allowed), "type")
 
 
 def parse_category_kind(value: object) -> CategoryKind:
@@ -83,4 +84,4 @@ def parse_category_kind(value: object) -> CategoryKind:
         except ValueError:
             pass
     allowed = ", ".join(k.value for k in CategoryKind)
-    raise ValidationError(f"Invalid category kind {value!r}; expected one of: {allowed}.", "kind")
+    raise ValidationError(tr("Invalid category kind {0!r}; expected one of: {1}.", value, allowed), "kind")

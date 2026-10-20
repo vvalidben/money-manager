@@ -19,6 +19,8 @@ from money_manager import APP_NAME
 from money_manager.core.config import AppConfig
 from money_manager.core.errors import MoneyManagerError
 from money_manager.domain.recurring import RecordOutcome
+from money_manager.services.update_service import UpdateInfo
+from money_manager.ui.ai.background import BackgroundCall, run_in_background
 from money_manager.services import AppServices
 from money_manager.ui.accounts.accounts_page import AccountsPage
 from money_manager.ui.advisor.advisor_page import AdvisorPage
@@ -62,12 +64,14 @@ from money_manager.ui.statistics.statistics_page import StatisticsPage
 from money_manager.ui.subscriptions.subscriptions_page import SubscriptionsPage
 from money_manager.ui.theme import Colors, page_fill
 from money_manager.ui.transactions.transactions_page import TransactionsPage
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_WINDOW_SIZE = QSize(1200, 760)
 MINIMUM_WINDOW_SIZE = QSize(960, 600)
 RECURRING_CHECK_MS = 60 * 60 * 1000  # recurring entries due are recorded hourly
+UPDATE_CHECK_DELAY_MS = 8000  # the opt-in update check waits until the window has settled
 
 
 class MainWindow(QMainWindow):
@@ -148,9 +152,27 @@ class MainWindow(QMainWindow):
         self.recurring_timer.timeout.connect(self.record_recurring)
         self.recurring_timer.start()
         QTimer.singleShot(0, self.record_recurring)
+        self._update_call: BackgroundCall | None = None
+        QTimer.singleShot(UPDATE_CHECK_DELAY_MS, self.check_for_updates)
 
     def lock(self) -> None:
         self.app_lock.lock()
+
+    def check_for_updates(self) -> None:
+        """The opt-in daily check; a newer version is announced with a notice."""
+        try:
+            if not self._services.updates.due():
+                return
+        except MoneyManagerError:
+            return
+        self._update_call = run_in_background(self._services.updates.check,
+                                              self._update_checked,
+                                              lambda _error: None, owner=self)
+
+    def _update_checked(self, info: UpdateInfo) -> None:
+        if info.is_newer:
+            self._show_notice(tr("Money Manager {0} is available", info.latest),
+                              tr("Settings \u2192 Updates \u2192 Download"))
 
     def record_recurring(self) -> RecordOutcome | None:
         try:
@@ -160,11 +182,12 @@ class MainWindow(QMainWindow):
             return None
         if outcome.recorded:
             count = outcome.recorded
-            self._show_notice(f"{count} recurring {'entry' if count == 1 else 'entries'} "
-                              "recorded", "Transactions → Recurring…")
+            title = (tr("1 recurring entry recorded") if count == 1
+                     else tr("{0} recurring entries recorded", count))
+            self._show_notice(title, tr("Transactions → Recurring…"))
         elif outcome.problems:
             problem = outcome.problems[0]
-            self._show_notice("A recurring entry could not be recorded",
+            self._show_notice(tr("A recurring entry could not be recorded"),
                               f"{problem.description}: {problem.message}")
         if outcome.recorded:
             self.current_page.force_refresh()
@@ -196,24 +219,24 @@ class MainWindow(QMainWindow):
         """Search, Ask AI and New entry: shown in the header of whichever page is open."""
         self.global_search = QLineEdit()
         self.global_search.setObjectName("GlobalSearch")
-        self.global_search.setPlaceholderText("Search entries")
-        self.global_search.setAccessibleName("Search entries")
-        self.global_search.setToolTip("Search transactions: type and press Enter")
+        self.global_search.setPlaceholderText(tr("Search entries"))
+        self.global_search.setAccessibleName(tr("Search entries"))
+        self.global_search.setToolTip(tr("Search transactions: type and press Enter"))
         self.global_search.setClearButtonEnabled(True)
         self.global_search.setMinimumWidth(180)
         self.global_search.addAction(line_icon(SEARCH_PATH, Colors.TEXT_MUTED, 16),
                                      QLineEdit.ActionPosition.LeadingPosition)
         self.global_search.returnPressed.connect(self.search_entries)
 
-        self.ask_button = QPushButton("Ask AI")
+        self.ask_button = QPushButton(tr("Ask AI"))
         self.ask_button.setIcon(line_icon(ICON_PATHS[AI_ADVISOR_PAGE_KEY], Colors.CYAN, 16))
-        self.ask_button.setToolTip("Open the AI Advisor")
+        self.ask_button.setToolTip(tr("Open the AI Advisor"))
         self.ask_button.clicked.connect(self.ask_ai)
 
-        self.new_entry_button = QPushButton("New entry")
+        self.new_entry_button = QPushButton(tr("New entry"))
         self.new_entry_button.setObjectName("PrimaryButton")
         self.new_entry_button.setIcon(line_icon(PLUS_PATH, Colors.ON_ACCENT, 16, 2.2))
-        self.new_entry_button.setToolTip("Record a transaction")
+        self.new_entry_button.setToolTip(tr("Record a transaction"))
         self.new_entry_button.clicked.connect(self.new_entry)
 
         controls = QWidget()
@@ -298,7 +321,7 @@ class MainWindow(QMainWindow):
 
     def show_page(self, key: str) -> None:
         if key not in self._pages:
-            raise KeyError(f"Unknown page: {key!r}")
+            raise KeyError(tr("Unknown page: {0!r}", key))
         page = self._pages[key]
         self._stack.setCurrentWidget(page)
         self._sidebar.set_current(key)

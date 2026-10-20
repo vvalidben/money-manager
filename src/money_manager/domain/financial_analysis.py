@@ -59,6 +59,7 @@ from money_manager.domain.periods import (
     same_days_previous_month,
 )
 from money_manager.domain.validation import normalize_name
+from money_manager.core.i18n import tr
 
 TREND_MONTHS = 6
 STABLE_BAND = Decimal("0.05")
@@ -229,7 +230,7 @@ def detect_unusual_spending(
                                       currency)
 
     def name(category_id: int | None) -> str:
-        return "Uncategorised" if category_id is None else names.get(category_id, "?")
+        return tr("Uncategorised") if category_id is None else names.get(category_id, "?")
 
     found: list[UnusualSpending] = []
     for category_id, amount in current.items():
@@ -432,17 +433,16 @@ def _change_fact(code: str, label: str, current: Money, previous: Money,
     if change is None:
         if current.is_zero():
             return None
-        return Fact(code, f"{label}: {money_text(current)}; nothing recorded in the comparison "
-                          f"period ({range_text(comparison)}).", data)
+        return Fact(code, tr("{0}: {1}; nothing recorded in the comparison period ({2}).", label, money_text(current), range_text(comparison)), data)
     data["change"] = str(change)
     if change == 0:
-        verb = "were unchanged" if plural else "was unchanged"
+        verb = tr("were unchanged") if plural else tr("was unchanged")
         detail = ""
     else:
         verb = "increased" if change > 0 else "decreased"
         verb = f"{verb} by {percent_text(abs(change))}"
         detail = f" ({money_text(previous)} -> {money_text(current)})"
-    return Fact(code, f"{label} {verb} compared with {range_text(comparison)}{detail}.", data)
+    return Fact(code, tr("{0} {1} compared with {2}{3}.", label, verb, range_text(comparison), detail), data)
 
 
 def _trend_fact(code: str, label: str, trend: MetricTrend) -> Fact | None:
@@ -450,10 +450,10 @@ def _trend_fact(code: str, label: str, trend: MetricTrend) -> Fact | None:
         return None
     months = len(trend.series)
     data = {"direction": trend.direction.value, "months": str(months)}
-    text = f"{label} over the last {months} complete months: {trend.direction.value}"
+    text = tr("{0} over the last {1} complete months: {2}", label, months, trend.direction.value)
     if trend.change is not None:
         data["change"] = str(trend.change)
-        text += f" ({percent_text(trend.change, signed=True)}, newer vs older half)"
+        text += tr(" ({0}, newer vs older half)", percent_text(trend.change, signed=True))
     return Fact(code, text + ".", data)
 
 
@@ -461,63 +461,54 @@ def build_facts(analysis: FinancialAnalysis) -> tuple[Fact, ...]:
     """Neutral, measurable statements; a fact is left out when its data is missing."""
     totals, period = analysis.totals, analysis.period
     facts: list[Fact | None] = [
-        Fact("balance", f"Balance on {period.end.isoformat()}: "
-                        f"{money_text(analysis.current_balance)}.",
+        Fact("balance", tr("Balance on {0}: {1}.", period.end.isoformat(), money_text(analysis.current_balance)),
              {"balance": str(analysis.current_balance.amount)}),
-        Fact("net_change", f"The balance changed by "
-                           f"{'+' if totals.net_change.is_positive() else ''}"
-                           f"{money_text(totals.net_change)} from {range_text(period)}.",
+        Fact("net_change", tr("The balance changed by {0}{1} from {2}.", '+' if totals.net_change.is_positive() else '', money_text(totals.net_change), range_text(period)),
              {"net_change": str(totals.net_change.amount)}),
     ]
     if analysis.comparison_complete:
         facts += [
-            _change_fact("income_change", "Income", totals.income,
+            _change_fact("income_change", tr("Income"), totals.income,
                          analysis.comparison_totals.income, analysis.comparison_period,
                          plural=False),
-            _change_fact("expenses_change", "Expenses", totals.expenses,
+            _change_fact("expenses_change", tr("Expenses"), totals.expenses,
                          analysis.comparison_totals.expenses, analysis.comparison_period,
                          plural=True),
         ]
     elif analysis.tracking_start is not None:
         facts.append(Fact(
             "comparison_unavailable",
-            f"No comparison: the comparison period ({range_text(analysis.comparison_period)}) "
-            f"starts before tracking began on {analysis.tracking_start.isoformat()}.",
+            tr("No comparison: the comparison period ({0}) starts before tracking began "
+               "on {1}.", range_text(analysis.comparison_period), analysis.tracking_start.isoformat()),
             {"comparison_period": range_text(analysis.comparison_period),
              "tracking_start": analysis.tracking_start.isoformat()}))
     if analysis.spending_ratio is not None:
         facts.append(Fact("spending_ratio",
-                          f"Spending was {percent_text(analysis.spending_ratio)} of income.",
+                          tr("Spending was {0} of income.", percent_text(analysis.spending_ratio)),
                           {"spending_ratio": str(analysis.spending_ratio)}))
     elif totals.spending.is_positive():
-        facts.append(Fact("no_income", f"No income was recorded while spending was "
-                                        f"{money_text(totals.spending)}.",
+        facts.append(Fact("no_income", tr("No income was recorded while spending was {0}.", money_text(totals.spending)),
                           {"spending": str(totals.spending.amount)}))
     if analysis.savings_rate is not None:
         facts.append(Fact("savings_rate",
-                          f"Savings were {money_text(totals.savings)}, "
-                          f"{percent_text(analysis.savings_rate)} of income.",
+                          tr("Savings were {0}, {1} of income.", money_text(totals.savings), percent_text(analysis.savings_rate)),
                           {"savings": str(totals.savings.amount),
                            "savings_rate": str(analysis.savings_rate)}))
     if analysis.investment_rate is not None and totals.investments.is_positive():
         facts.append(Fact("investment_rate",
-                          f"Investment contributions were {money_text(totals.investments)}, "
-                          f"{percent_text(analysis.investment_rate)} of income.",
+                          tr("Investment contributions were {0}, {1} of income.", money_text(totals.investments), percent_text(analysis.investment_rate)),
                           {"investments": str(totals.investments.amount),
                            "investment_rate": str(analysis.investment_rate)}))
     largest = analysis.largest_expense_category
     if largest is not None and largest.share is not None:
         facts.append(Fact("largest_category",
-                          f"Largest spending category: {largest.name}, "
-                          f"{money_text(largest.amount)} ({percent_text(largest.share)} of "
-                          "spending).",
+                          tr("Largest spending category: {0}, {1} ({2} of spending).", largest.name, money_text(largest.amount), percent_text(largest.share)),
                           {"category": largest.name, "amount": str(largest.amount.amount),
                            "share": str(largest.share)}))
     for change in (analysis.category_changes[:3] if analysis.comparison_complete else ()):
         if change.is_new:
             facts.append(Fact("category_new",
-                              f"{change.name}: {money_text(change.current)}, with no spending in "
-                              "the comparison period.",
+                              tr("{0}: {1}, with no spending in the comparison period.", change.name, money_text(change.current)),
                               {"category": change.name, "current": str(change.current.amount)}))
         elif change.change_ratio is not None and change.change_ratio != 0:
             verb = "increased" if change.change_ratio > 0 else "decreased"
@@ -533,19 +524,17 @@ def build_facts(analysis: FinancialAnalysis) -> tuple[Fact, ...]:
     recurring = analysis.recurring
     if recurring.detected:
         share = ("" if recurring.share_of_monthly_spending is None else
-                 f" ({percent_text(recurring.share_of_monthly_spending)} of average monthly "
-                 "spending)")
+                 tr(" ({0} of average monthly spending)", percent_text(recurring.share_of_monthly_spending)))
         facts.append(Fact("recurring",
-                          f"{len(recurring.detected)} recurring expenses detected, about "
-                          f"{money_text(recurring.detected_monthly_total)} per month{share}; "
-                          f"{len(recurring.untracked)} not tracked as subscriptions.",
+                          tr("{0} recurring expenses detected, about {1} per month{2}; {3} not "
+                             "tracked as subscriptions.", len(recurring.detected), money_text(recurring.detected_monthly_total), share, len(recurring.untracked)),
                           {"count": str(len(recurring.detected)),
                            "monthly_total": str(recurring.detected_monthly_total.amount),
                            "untracked": str(len(recurring.untracked))}))
     facts.extend([
-        _trend_fact("income_trend", "Income", analysis.income_trend),
-        _trend_fact("expense_trend", "Spending", analysis.expense_trend),
-        _trend_fact("balance_trend", "Month-end balance", analysis.balance_trend),
+        _trend_fact("income_trend", tr("Income"), analysis.income_trend),
+        _trend_fact("expense_trend", tr("Spending"), analysis.expense_trend),
+        _trend_fact("balance_trend", tr("Month-end balance"), analysis.balance_trend),
     ])
     return tuple(f for f in facts if f is not None)
 
@@ -557,16 +546,12 @@ def _unusual_fact(item: UnusualSpending) -> Fact:
         data["factor"] = str(item.factor)
     match item.kind:
         case UnusualKind.CATEGORY_SPIKE:
-            text = (f"{item.category_name} spending of {money_text(item.amount)} is "
-                    f"{item.factor}x its average of {money_text(item.baseline)} over the "
-                    f"previous {BASELINE_PERIODS} periods.")
+            text = (tr("{0} spending of {1} is {2}x its average of {3} over the previous {4} "
+                       "periods.", item.category_name, money_text(item.amount), item.factor, money_text(item.baseline), BASELINE_PERIODS))
         case UnusualKind.NEW_CATEGORY:
-            text = (f"{item.category_name} spending of {money_text(item.amount)} has no "
-                    f"history in the previous {BASELINE_PERIODS} periods.")
+            text = (tr("{0} spending of {1} has no history in the previous {2} periods.", item.category_name, money_text(item.amount), BASELINE_PERIODS))
         case UnusualKind.LARGE_EXPENSE:
             assert item.day is not None
             data["date"] = item.day.isoformat()
-            text = (f"A single {item.category_name} expense of {money_text(item.amount)} on "
-                    f"{item.day.isoformat()} is {item.factor}x the typical expense of "
-                    f"{money_text(item.baseline)}.")
+            text = (tr("A single {0} expense of {1} on {2} is {3}x the typical expense of {4}.", item.category_name, money_text(item.amount), item.day.isoformat(), item.factor, money_text(item.baseline)))
     return Fact("unusual_" + item.kind.value, text, data)

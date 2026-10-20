@@ -43,6 +43,7 @@ from money_manager.persistence.repositories import (
     TransactionRepository,
 )
 from money_manager.services.currency import ensure_single_currency
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +70,10 @@ class StatisticsService:
         """Validate user-picked dates and build a range."""
         for value, field in ((start, "start"), (end, "end")):
             if isinstance(value, datetime) or not isinstance(value, date):
-                raise ValidationError("Enter a valid calendar date.", field)
+                raise ValidationError(tr("Enter a valid calendar date."), field)
         assert isinstance(start, date) and isinstance(end, date)
         if start > end:
-            raise ValidationError("The start date must not be after the end date.", "start")
+            raise ValidationError(tr("The start date must not be after the end date."), "start")
         period = DateRange(start, end)
         self._validate(period)
         return period
@@ -89,7 +90,7 @@ class StatisticsService:
 
         with self._database.session() as session:
             accounts = AccountRepository(session).list_all()
-            ensure_single_currency(accounts, self._currency, "statistics page")
+            ensure_single_currency(accounts, self._currency, tr("statistics page"))
             repository = TransactionRepository(session)
             daily = repository.daily_net_minor(until=period.end)
             entries = [LedgerEntry(*row) for row in repository.ledger_entries(window_start, period.end)]
@@ -132,12 +133,12 @@ class StatisticsService:
 
     def _validate(self, period: DateRange) -> None:
         if not isinstance(period, DateRange):
-            raise ValidationError("Choose a date range.", "period")
+            raise ValidationError(tr("Choose a date range."), "period")
         if period.end > self._today():
-            raise ValidationError("The range cannot end in the future.", "end")
+            raise ValidationError(tr("The range cannot end in the future."), "end")
         if period.start < EARLIEST_ALLOWED_DATE:
             raise ValidationError(
-                f"The range cannot start before {EARLIEST_ALLOWED_DATE.isoformat()}.", "start"
+                tr("The range cannot start before {0}.", EARLIEST_ALLOWED_DATE.isoformat()), "start"
             )
         if period.days > MAX_RANGE_DAYS:
-            raise ValidationError("Choose a range of at most ten years.", "start")
+            raise ValidationError(tr("Choose a range of at most ten years."), "start")

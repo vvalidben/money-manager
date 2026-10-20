@@ -17,11 +17,13 @@ from PySide6.QtCore import QMarginsF, QSizeF, QUrl
 from PySide6.QtGui import QFont, QImage, QPageLayout, QPageSize, QPdfWriter, QTextDocument
 
 from money_manager import __version__
+from money_manager.core.i18n import tr
 from money_manager.domain.analytics import CategoryAmount
 from money_manager.domain.investments import NetWorthPoint
 from money_manager.domain.money import sum_money
 from money_manager.domain.report import MonthlyReport
 from money_manager.ui.charts.base import plot_value
+from money_manager.ui.charts.money import band_label
 from money_manager.ui.formatting import (
     format_compact_amount,
     format_date,
@@ -68,7 +70,7 @@ def write_monthly_report(report: MonthlyReport, path: Path) -> None:
                                      MARGINS_MM, QPageLayout.Unit.Millimeter))
     document.print_(writer)
     if not path.is_file() or path.stat().st_size == 0:
-        raise OSError(f"The report could not be written to {path}.")
+        raise OSError(tr("The report could not be written to {0}.", path))
 
 
 def build_document(report: MonthlyReport) -> QTextDocument:
@@ -91,13 +93,13 @@ def build_document(report: MonthlyReport) -> QTextDocument:
 
 def report_html(report: MonthlyReport, *, charts: set[str] | None = None) -> str:
     charts = set() if charts is None else charts
-    parts = [_STYLE, _title(report), _summary(report), _net_worth(report, NET_WORTH_URL in charts),
+    parts = [STYLE, _title(report), _summary(report), _net_worth(report, NET_WORTH_URL in charts),
              _budgets(report), _goals(report), _spending(report, SPENDING_URL in charts),
              _largest(report), _footer(report)]
     return "<html><body>" + "".join(parts) + "</body></html>"
 
 
-_STYLE = f"""<style>
+STYLE = f"""<style>
 body {{ color: {INK}; }}
 h1 {{ font-size: 20pt; font-weight: 600; margin: 0; }}
 h2 {{ font-size: 12.5pt; font-weight: 600; margin-top: 18px; margin-bottom: 6px; }}
@@ -116,10 +118,11 @@ table.data td {{ border-bottom: 1px solid {RULE}; }}
 
 def _title(report: MonthlyReport) -> str:
     span = format_day_range(report.period.start, report.period.end)
-    scope = span if report.is_complete else f"{span}, month to date"
-    return (f"<p class='muted small'>MONEY MANAGER · MONTHLY REPORT</p>"
+    scope = span if report.is_complete else tr("{0}, month to date", span)
+    return (f"<p class='muted small'>{tr('MONEY MANAGER · MONTHLY REPORT')}</p>"
             f"<h1>{format_month(report.month)}</h1>"
-            f"<p class='muted'>{scope} · made on {format_date(report.generated_on)}</p>")
+            f"<p class='muted'>{tr('{0} · made on {1}', scope, format_date(report.generated_on))}"
+            "</p>")
 
 
 def _summary(report: MonthlyReport) -> str:
@@ -128,10 +131,10 @@ def _summary(report: MonthlyReport) -> str:
     previous = previous_label(report) if stats.comparison_complete else None
     cells = []
     for label, value, prior, higher_is_good in (
-        ("Income", now.income, before.income, True),
-        ("Spending", now.spending, before.spending, False),
-        ("Invested", now.investments, before.investments, True),
-        ("Saved", now.savings, before.savings, True),
+        (tr("Income"), now.income, before.income, True),
+        (tr("Spending"), now.spending, before.spending, False),
+        (tr("Invested"), now.investments, before.investments, True),
+        (tr("Saved"), now.savings, before.savings, True),
     ):
         change = ""
         if previous is not None:
@@ -139,18 +142,19 @@ def _summary(report: MonthlyReport) -> str:
             tone = "" if delta.is_zero() else (
                 "good" if delta.is_positive() == higher_is_good else "bad")
             change = (f"<br><span class='small {tone}'>{format_signed_money(delta)}"
-                      f"</span><span class='small muted'> vs {previous}</span>")
+                      f"</span><span class='small muted'> {tr('vs {0}', previous)}</span>")
         cells.append(f"<td width='25%'><p class='muted small'>{label.upper()}</p>"
                      f"<p class='kpi'>{format_money(value)}</p>{change}</td>")
     rate = now.savings_rate
     if rate is None:
-        rate_text = "No income recorded, so there is no savings rate."
+        rate_text = tr("No income recorded, so there is no savings rate.")
     elif now.savings.is_negative():
-        rate_text = f"You spent <b>{format_money(-now.savings)}</b> more than your income."
+        rate_text = tr("You spent <b>{0}</b> more than your income.",
+                       format_money(-now.savings))
     else:
-        rate_text = (f"You kept <b>{format_percent(rate)}</b> of your income "
-                     f"(income − spending; money invested counts as kept).")
-    return ("<h2>Summary</h2><table width='100%' cellpadding='4' cellspacing='0'><tr>"
+        rate_text = tr("You kept <b>{0}</b> of your income (income − spending; money invested "
+                       "counts as kept).", format_percent(rate))
+    return (f"<h2>{tr('Summary')}</h2><table width='100%' cellpadding='4' cellspacing='0'><tr>"
             + "".join(cells) + f"</tr></table><p class='muted small'>{rate_text}</p>")
 
 
@@ -158,13 +162,15 @@ def _net_worth(report: MonthlyReport, with_chart: bool) -> str:
     if not report.net_worth:
         return ""
     last = report.net_worth[-1]
-    rows = [("Balance of your accounts", last.balance),
-            ("Investments (latest values entered)", last.investments),
-            ("<b>Net worth</b>", last.net_worth)]
+    rows = [(tr("Balance of your accounts"), last.balance),
+            (tr("Investments (latest values entered)"), last.investments)]
+    if not last.loans.is_zero():
+        rows.append((tr("Loans (owed to you − you owe)"), last.loans))
+    rows.append((f"<b>{tr('Net worth')}</b>", last.net_worth))
     table = "".join(f"<tr><td>{label}</td><td align='right'>{format_money(value)}</td></tr>"
                     for label, value in rows)
     chart = (f"<p><img src='{NET_WORTH_URL}' width='{CHART_WIDTH_PX}'></p>" if with_chart else "")
-    return (f"<h2>Balance and net worth on {format_date(last.on)}</h2>"
+    return (f"<h2>{tr('Balance and net worth on {0}', format_date(last.on))}</h2>"
             f"<table class='data' width='60%' cellpadding='5'>{table}</table>{chart}")
 
 
@@ -172,8 +178,8 @@ def _spending(report: MonthlyReport, with_chart: bool) -> str:
     stats = report.statistics
     rows = stats.spending_by_category
     if not rows:
-        return ("<h2 style='page-break-before: always'>Where the money went</h2>"
-                "<p class='muted'>No spending recorded.</p>")
+        return (f"<h2 style='page-break-before: always'>{tr('Where the money went')}</h2>"
+                f"<p class='muted'>{tr('No spending recorded.')}</p>")
     changes = {c.category_id: c for c in stats.category_changes}
     body = []
     for row in rows:
@@ -184,10 +190,11 @@ def _spending(report: MonthlyReport, with_chart: bool) -> str:
         body.append(f"<tr><td>{escape(row.name)}</td><td align='right'>{format_money(row.amount)}"
                     f"</td><td align='right'>{share}</td><td align='right'>{delta}</td></tr>")
     chart = f"<p><img src='{SPENDING_URL}' width='{CHART_WIDTH_PX}'></p>" if with_chart else ""
-    return ("<h2 style='page-break-before: always'>Where the money went</h2>" + chart
-            + "<table class='data' width='100%' cellpadding='5'><tr><th>Category</th>"
-            "<th align='right'>Spent</th><th align='right'>Share</th>"
-            f"<th align='right'>vs {previous_label(report)}</th></tr>" + "".join(body) + "</table>")
+    return (f"<h2 style='page-break-before: always'>{tr('Where the money went')}</h2>" + chart
+            + f"<table class='data' width='100%' cellpadding='5'><tr><th>{tr('Category')}</th>"
+            f"<th align='right'>{tr('Spent')}</th><th align='right'>{tr('Share')}</th>"
+            f"<th align='right'>{tr('vs {0}', previous_label(report))}</th></tr>"
+            + "".join(body) + "</table>")
 
 
 def previous_label(report: MonthlyReport) -> str:
@@ -210,9 +217,10 @@ def _budgets(report: MonthlyReport) -> str:
             f"<td align='right'>{format_money(status.spent)}</td>"
             f"<td align='right'>{format_money(status.remaining)}</td>"
             f"<td class='{tone}'>{status.level.label}</td></tr>")
-    return ("<h2>Budgets</h2><table class='data' width='100%' cellpadding='5'><tr>"
-            "<th>Category</th><th align='right'>Limit</th><th align='right'>Spent</th>"
-            "<th align='right'>Left</th><th>Status</th></tr>" + "".join(body) + "</table>")
+    return (f"<h2>{tr('Budgets')}</h2><table class='data' width='100%' cellpadding='5'><tr>"
+            f"<th>{tr('Category')}</th><th align='right'>{tr('Limit')}</th>"
+            f"<th align='right'>{tr('Spent')}</th><th align='right'>{tr('Left')}</th>"
+            f"<th>{tr('Status')}</th></tr>" + "".join(body) + "</table>")
 
 
 def _goals(report: MonthlyReport) -> str:
@@ -225,10 +233,11 @@ def _goals(report: MonthlyReport) -> str:
             f"<tr><td>{escape(goal.goal.name)}</td><td align='right'>{format_money(goal.saved)}</td>"
             f"<td align='right'>{format_money(goal.goal.target)}</td>"
             f"<td align='right'>{format_percent(goal.progress)}</td><td>{deadline}</td></tr>")
-    return (f"<h2>Goals on {format_date(report.generated_on)}</h2>"
-            "<table class='data' width='100%' cellpadding='5'><tr><th>Goal</th>"
-            "<th align='right'>Saved</th><th align='right'>Target</th><th align='right'>Progress</th>"
-            "<th>Deadline</th></tr>" + "".join(body) + "</table>")
+    return (f"<h2>{tr('Goals on {0}', format_date(report.generated_on))}</h2>"
+            f"<table class='data' width='100%' cellpadding='5'><tr><th>{tr('Goal')}</th>"
+            f"<th align='right'>{tr('Saved')}</th><th align='right'>{tr('Target')}</th>"
+            f"<th align='right'>{tr('Progress')}</th><th>{tr('Deadline')}</th></tr>"
+            + "".join(body) + "</table>")
 
 
 def _largest(report: MonthlyReport) -> str:
@@ -239,16 +248,17 @@ def _largest(report: MonthlyReport) -> str:
         category = report.category_names.get(t.category_id, "—") if t.category_id else "—"
         body.append(f"<tr><td>{format_date(t.occurred_on)}</td><td>{escape(t.description)}</td>"
                     f"<td>{escape(category)}</td><td align='right'>{format_money(t.amount)}</td></tr>")
-    return ("<h2>Largest expenses</h2><table class='data' width='100%' cellpadding='5'><tr>"
-            "<th>Date</th><th>Description</th><th>Category</th><th align='right'>Amount</th></tr>"
-            + "".join(body) + "</table>")
+    return (f"<h2>{tr('Largest expenses')}</h2>"
+            f"<table class='data' width='100%' cellpadding='5'><tr><th>{tr('Date')}</th>"
+            f"<th>{tr('Description')}</th><th>{tr('Category')}</th>"
+            f"<th align='right'>{tr('Amount')}</th></tr>" + "".join(body) + "</table>")
 
 
 def _footer(report: MonthlyReport) -> str:
-    return (f"<p class='muted small' style='margin-top: 18px'>Made by Money Manager {__version__}"
-            f" on your computer from the entries you recorded. Amounts in {report.currency}."
-            " Transfers between your accounts and balance corrections are not counted as "
-            "income or spending.</p>")
+    text = tr("Made by Money Manager {0} on your computer from the entries you recorded. "
+              "Amounts in {1}. Transfers between your accounts and balance corrections are not "
+              "counted as income or spending.", __version__, report.currency)
+    return f"<p class='muted small' style='margin-top: 18px'>{text}</p>"
 
 
 # -------------------------------------------------------------------- charts
@@ -284,13 +294,14 @@ def net_worth_chart(points: Sequence[NetWorthPoint]) -> QImage:
     _style_axes(ax)
     xs = list(range(len(points)))
     worth = [plot_value(p.net_worth) for p in points]
-    if any(not p.investments.is_zero() for p in points):
+    band = band_label(points)
+    if band is not None:
         balance = [plot_value(p.balance) for p in points]
-        ax.fill_between(xs, balance, worth, color=BAND, alpha=0.25, linewidth=0,
-                        label="Investments")
-        ax.plot(xs, balance, color=BAND, linewidth=1.4, label="Balance")
-    ax.plot(xs, worth, color=LINE, linewidth=2, marker="o", markersize=3.5, label="Net worth")
-    if any(not p.investments.is_zero() for p in points):
+        ax.fill_between(xs, balance, worth, color=BAND, alpha=0.25, linewidth=0, label=band)
+        ax.plot(xs, balance, color=BAND, linewidth=1.4, label=tr("Balance"))
+    ax.plot(xs, worth, color=LINE, linewidth=2, marker="o", markersize=3.5,
+            label=tr("Net worth"))
+    if band is not None:
         ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), frameon=False, fontsize=8, ncols=3,
                   labelcolor=MUTED, borderaxespad=0.2)
     ax.set_xticks(xs, [month_abbreviation(p.month) for p in points])
@@ -303,7 +314,7 @@ def spending_chart(rows: Sequence[CategoryAmount]) -> QImage:
     rest = rows[CHART_SLOTS:]
     if rest:
         currency = rest[0].amount.currency
-        shown[-1:] = [CategoryAmount(None, "Other", sum_money(
+        shown[-1:] = [CategoryAmount(None, tr("Other"), sum_money(
             (r.amount for r in [shown[-1], *rest]), currency), None)]
     figure = _figure(0.35 + 0.28 * max(len(shown), 1))
     ax = figure.add_subplot()

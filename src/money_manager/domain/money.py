@@ -17,6 +17,7 @@ from functools import total_ordering
 from typing import Self
 
 from money_manager.core.errors import CurrencyMismatchError, ValidationError
+from money_manager.core.i18n import language, tr
 
 DEFAULT_CURRENCY = "MAD"
 MINOR_UNIT_DIGITS = 2
@@ -40,10 +41,10 @@ def parse_amount(
     non-finite values, more than two decimal places and values above ``limit``.
     """
     if isinstance(value, bool):
-        raise ValidationError("Amount must be a number.", field)
+        raise ValidationError(tr("Amount must be a number."), field)
     if isinstance(value, float):
         raise ValidationError(
-            "Amounts must not be floats; use a Decimal or a string such as '12.50'.", field
+            tr("Amounts must not be floats; use a Decimal or a string such as '12.50'."), field
         )
     if isinstance(value, Decimal):
         amount = value
@@ -52,22 +53,22 @@ def parse_amount(
     elif isinstance(value, str):
         text = value.strip()
         if not text:
-            raise ValidationError("Enter an amount.", field)
+            raise ValidationError(tr("Enter an amount."), field)
         try:
             amount = Decimal(text)
         except InvalidOperation:
-            raise ValidationError(f"{value!r} is not a valid amount.", field) from None
+            raise ValidationError(tr("{0!r} is not a valid amount.", value), field) from None
     else:
-        raise ValidationError(f"Unsupported amount type: {type(value).__name__}.", field)
+        raise ValidationError(tr("Unsupported amount type: {0}.", type(value).__name__), field)
 
     if not amount.is_finite():
-        raise ValidationError("Amount must be a finite number.", field)
+        raise ValidationError(tr("Amount must be a finite number."), field)
     if abs(amount) > limit:
-        raise ValidationError(f"Amount must not exceed {limit:,} in size.", field)
+        raise ValidationError(tr("Amount must not exceed {0:,} in size.", limit), field)
     quantized = amount.quantize(_QUANTUM)
     if quantized != amount:
         raise ValidationError(
-            f"Amount can have at most {MINOR_UNIT_DIGITS} decimal places.", field
+            tr("Amount can have at most {0} decimal places.", MINOR_UNIT_DIGITS), field
         )
     # Normalise -0.00 so it never displays as a negative amount.
     return quantized.copy_abs() if quantized.is_zero() else quantized
@@ -85,26 +86,26 @@ def parse_amount_text(text: object, field: str = "amount") -> Decimal:
     rejected as ambiguous instead of guessing between thousands and decimals.
     """
     if not isinstance(text, str):
-        raise ValidationError("Enter an amount.", field)
+        raise ValidationError(tr("Enter an amount."), field)
     compact = text.strip().translate(_GROUPING_SPACES)
     if not compact:
-        raise ValidationError("Enter an amount.", field)
+        raise ValidationError(tr("Enter an amount."), field)
     if "," in compact and "." in compact:
         raise ValidationError(
-            "Use either a comma or a dot for decimals, and spaces to group thousands.", field
+            tr("Use either a comma or a dot for decimals, and spaces to group thousands."), field
         )
     if compact.count(",") + compact.count(".") > 1:
-        raise ValidationError("Group thousands with spaces, e.g. 1 200 000.", field)
+        raise ValidationError(tr("Group thousands with spaces, e.g. 1 200 000."), field)
     compact = compact.replace(",", ".")
     _, separator, decimals = compact.partition(".")
     if separator and len(decimals) == 3 and decimals.isdigit():
         raise ValidationError(
-            f"'{text.strip()}' is ambiguous: write 1200 or 1 200 for thousands, "
-            "or 1.20 for decimals.",
+            tr("'{0}' is ambiguous: write 1200 or 1 200 for thousands, or 1.20 for "
+               "decimals.", text.strip()),
             field,
         )
     if not _TYPED_AMOUNT.fullmatch(compact):
-        raise ValidationError(f"'{text.strip()}' is not a valid amount.", field)
+        raise ValidationError(tr("'{0}' is not a valid amount.", text.strip()), field)
     return parse_amount(compact, field)
 
 
@@ -117,7 +118,7 @@ def validate_currency(code: object) -> str:
         and code.isupper()
     ):
         raise ValidationError(
-            "Currency must be a three-letter ISO 4217 code such as 'MAD'.", "currency"
+            tr("Currency must be a three-letter ISO 4217 code such as 'MAD'."), "currency"
         )
     return code
 
@@ -192,12 +193,15 @@ class Money:
         return self.amount < other.amount
 
     def __str__(self) -> str:
-        return f"{self.amount:,.2f} {self.currency}"
+        text = f"{self.amount:,.2f}"
+        if language() == "fr":  # 12 000,50 MAD
+            text = text.replace(",", " ").replace(".", ",")
+        return f"{text} {self.currency}"
 
     def _require_same_currency(self, other: "Money") -> None:
         if other.currency != self.currency:
             raise CurrencyMismatchError(
-                f"Cannot combine {self.currency} and {other.currency} amounts."
+                tr("Cannot combine {0} and {1} amounts.", self.currency, other.currency)
             )
 
 

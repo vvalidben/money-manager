@@ -50,6 +50,7 @@ from money_manager.ui.pages.registry import (
 )
 from money_manager.ui.theme import SIDE_BY_SIDE_MIN_WIDTH, Spacing
 from money_manager.ui.transactions.rows import TransferSide, build_rows, transfer_sides
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -66,18 +67,18 @@ class DashboardPage(BasePage):
 
         self.stat_cards = tuple(StatCard("") for _ in range(4))
         self.flows_card = ChartCard(
-            "Income vs expenses", "Last 6 months · adjustments excluded", IncomeExpenseChart()
+            tr("Income vs expenses"), tr("Last 6 months · adjustments excluded"), IncomeExpenseChart()
         )
         self.allocation_card = AllocationOverview()
         self.net_worth_card = ChartCard(
-            "Net worth", "Balance plus investment values at the end of each month",
+            tr("Net worth"), tr("Balance plus investment values at the end of each month"),
             NetWorthChart(height_px=220),
         )
         self.balance_card = ChartCard(
-            "Balance history", "Total balance at the end of each day", BalanceHistoryChart()
+            tr("Balance history"), tr("Total balance at the end of each day"), BalanceHistoryChart()
         )
         self.spending_card = ChartCard(
-            "Spending by category", "This month · top 5, the rest grouped as Other",
+            tr("Spending by category"), tr("This month · top 5, the rest grouped as Other"),
             CategorySpendingChart(),
         )
         self.recent_card = RecentTransactions()
@@ -119,11 +120,11 @@ class DashboardPage(BasePage):
         content_layout.addStretch(1)
 
         self.empty_state = EmptyState(
-            "Create an account to get started",
-            "The dashboard summarises your real balance, income, spending and allocations. "
-            "Add the account you want to track first.",
+            tr("Create an account to get started"),
+            tr("The dashboard summarises your real balance, income, spending and allocations. "
+            "Add the account you want to track first."),
             badge=None,
-            action_text="Create account",
+            action_text=tr("Create account"),
         )
         self.empty_state.action_clicked.connect(self.create_account)
         content_layout.insertWidget(0, self.empty_state)
@@ -156,7 +157,7 @@ class DashboardPage(BasePage):
                 self._services.account_transfers.by_transaction(), names)
         except MoneyManagerError as exc:
             logger.warning("Could not load the dashboard: %s", exc)
-            dialogs.show_warning(self, "Could not load the dashboard", str(exc))
+            dialogs.show_warning(self, tr("Could not load the dashboard"), str(exc))
             return
         self.overview = overview
         self.net_worth = net_worth

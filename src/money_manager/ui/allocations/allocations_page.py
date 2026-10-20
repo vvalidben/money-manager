@@ -34,6 +34,7 @@ from money_manager.ui.components import Card, EmptyState, FlowRow, ResponsiveRow
 from money_manager.ui.pages.base_page import BasePage
 from money_manager.ui.pages.registry import PageSpec
 from money_manager.ui.theme import Spacing
+from money_manager.core.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -72,20 +73,20 @@ class AllocationCard(Card):
                 label.setWordWrap(True)
                 self.body.addWidget(label)
 
-        add = QPushButton("Add money")
+        add = QPushButton(tr("Add money"))
         add.setObjectName("PrimaryButton")
         add.clicked.connect(lambda: self.add_requested.emit(view.allocation_id))
-        take = QPushButton("Take out")
+        take = QPushButton(tr("Take out"))
         take.clicked.connect(lambda: self.take_requested.emit(view.allocation_id))
-        rename = QPushButton("Rename")
+        rename = QPushButton(tr("Rename"))
         rename.clicked.connect(lambda: self.rename_requested.emit(view.allocation_id))
-        self.archive_button = QPushButton("Archive")
+        self.archive_button = QPushButton(tr("Archive"))
         self.archive_button.setObjectName("DangerButton")
         self.archive_button.clicked.connect(lambda: self.archive_requested.emit(view.allocation_id))
         self.archive_button.setEnabled(view.can_archive)
         self.archive_button.setToolTip(
-            "Returns its money to Available" if view.can_archive
-            else "This allocation holds a goal's money; manage it on the Goals page")
+            tr("Returns its money to Available") if view.can_archive
+            else tr("This allocation holds a goal's money; manage it on the Goals page"))
         self.body.addStretch(1)
         # Four buttons wrap onto a second line in narrow cards instead of being squeezed.
         self.body.addWidget(FlowRow([add, take, rename, self.archive_button]))
@@ -100,13 +101,13 @@ class AllocationsPage(BasePage):
         self.moves: tuple[MoveView, ...] = ()
         self.archived: list[Allocation] = []
 
-        self.new_button = QPushButton("New allocation")
+        self.new_button = QPushButton(tr("New allocation"))
         self.new_button.setObjectName("PrimaryButton")
-        self.new_button.setToolTip("New allocation (Ctrl+N)")
+        self.new_button.setToolTip(tr("New allocation (Ctrl+N)"))
         self.new_button.clicked.connect(self.create_allocation)
         self.header.add_action(self.new_button)
         self.primary_button = self.new_button
-        self.move_button = QPushButton("Move money")
+        self.move_button = QPushButton(tr("Move money"))
         self.move_button.clicked.connect(lambda: self.move_money(None, None))
         self.header.add_action(self.move_button)
 
@@ -117,12 +118,12 @@ class AllocationsPage(BasePage):
         self.warning.setWordWrap(True)
         self.warning.hide()
         self.empty_state = EmptyState(
-            "Nothing set aside yet",
-            "Allocations organise the money you already have: set some aside for bills, a "
+            tr("Nothing set aside yet"),
+            tr("Allocations organise the money you already have: set some aside for bills, a "
             "holiday or an emergency fund. It stays in your accounts, but is no longer "
-            "counted as Available to spend. Goals keep their money in allocations too.",
+            "counted as Available to spend. Goals keep their money in allocations too."),
             badge=None,
-            action_text="Create an allocation",
+            action_text=tr("Create an allocation"),
         )
         self.empty_state.action_clicked.connect(self.create_allocation)
 
@@ -131,12 +132,12 @@ class AllocationsPage(BasePage):
         self.cards_layout = QVBoxLayout(self.cards_host)
         self.cards_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.moves_card = Card("Recent moves")
+        self.moves_card = Card(tr("Recent moves"))
         self.moves_grid = QGridLayout()
         self.moves_grid.setHorizontalSpacing(Spacing.MD)
         self.moves_grid.setVerticalSpacing(Spacing.XS)
         self.moves_card.body.addLayout(self.moves_grid)
-        self.archived_card = Card("Archived")
+        self.archived_card = Card(tr("Archived"))
         self.archived_grid = QGridLayout()
         self.archived_card.body.addLayout(self.archived_grid)
 
@@ -170,7 +171,7 @@ class AllocationsPage(BasePage):
             transfers = self._services.transfers.list()
         except MoneyManagerError as exc:
             logger.warning("Could not load allocations: %s", exc)
-            dialogs.show_warning(self, "Could not load allocations", str(exc))
+            dialogs.show_warning(self, tr("Could not load allocations"), str(exc))
             return
         self.summary = summary
         for card, stat in zip(self.stat_cards, summary_stats(summary), strict=True):
@@ -223,8 +224,8 @@ class AllocationsPage(BasePage):
             amount = QLabel(move.amount)
             amount.setObjectName("AllocationAmount")
             self.moves_grid.addWidget(amount, row, 3, Qt.AlignmentFlag.AlignRight)
-            undo = QPushButton("Undo")
-            undo.setToolTip("Return this money to where it came from")
+            undo = QPushButton(tr("Undo"))
+            undo.setToolTip(tr("Return this money to where it came from"))
             undo.clicked.connect(lambda _c=False, tid=move.transfer_id: self.undo_move(tid))
             self.moves_grid.addWidget(undo, row, 4)
         self.moves_grid.setColumnStretch(2, 1)
@@ -233,7 +234,7 @@ class AllocationsPage(BasePage):
         _clear(self.archived_grid)
         for row, allocation in enumerate(self.archived):
             self.archived_grid.addWidget(QLabel(allocation.name), row, 0)
-            restore = QPushButton("Restore")
+            restore = QPushButton(tr("Restore"))
             restore.clicked.connect(lambda _c=False, aid=allocation.id: self.restore(aid))
             self.archived_grid.addWidget(restore, row, 1, Qt.AlignmentFlag.AlignRight)
         self.archived_grid.setColumnStretch(0, 1)
@@ -244,7 +245,7 @@ class AllocationsPage(BasePage):
         dialog = self.make_allocation_dialog()
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved is not None:
             self.refresh()
-            self.notice.emit("Allocation created", dialog.saved.name)
+            self.notice.emit(tr("Allocation created"), dialog.saved.name)
 
     def move_money(self, from_id: int | None, to_id: int | None) -> None:
         dialog = self.make_move_dialog(from_id, to_id)
@@ -252,58 +253,57 @@ class AllocationsPage(BasePage):
             self.refresh()
             [move] = move_views([dialog.saved], {a.id: a.name for a in
                                                  self._services.allocations.list()})
-            self.notice.emit("Money moved", f"{move.amount} · {move.route}")
+            self.notice.emit(tr("Money moved"), f"{move.amount} · {move.route}")
 
     def rename_allocation(self, allocation_id: int) -> None:
         current = self.card_for(allocation_id).view.name
-        name, accepted = QInputDialog.getText(self, "Rename allocation", "New name:",
+        name, accepted = QInputDialog.getText(self, tr("Rename allocation"), tr("New name:"),
                                               text=current)
         if not accepted or not name.strip() or name.strip() == current:
             return
         try:
             renamed = self._services.allocations.rename(allocation_id, name)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not rename the allocation", str(exc))
+            dialogs.show_warning(self, tr("Could not rename the allocation"), str(exc))
             return
         self.refresh()
-        self.notice.emit("Allocation renamed", renamed.name)
+        self.notice.emit(tr("Allocation renamed"), renamed.name)
 
     def archive_allocation(self, allocation_id: int) -> None:
         view = self.card_for(allocation_id).view
-        message = (f"Archive {view.name}?\n\nIts {view.balance} goes back to Available. You can "
-                   "restore the allocation later from the Archived list.")
-        if not dialogs.confirm_destructive(self, "Archive allocation", message, "Archive"):
+        message = (tr("Archive {0}?\n\nIts {1} goes back to Available. You can restore the "
+                      "allocation later from the Archived list.", view.name, view.balance))
+        if not dialogs.confirm_destructive(self, tr("Archive allocation"), message, tr("Archive")):
             return
         try:
             self._services.allocations.archive(allocation_id)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not archive the allocation", str(exc))
+            dialogs.show_warning(self, tr("Could not archive the allocation"), str(exc))
             return
         self.refresh()
-        self.notice.emit("Allocation archived", f"{view.name} · {view.balance} to Available")
+        self.notice.emit(tr("Allocation archived"), tr("{0} · {1} to Available", view.name, view.balance))
 
     def undo_move(self, transfer_id: int) -> None:
         move = next(m for m in self.moves if m.transfer_id == transfer_id)
-        if not dialogs.confirm_destructive(self, "Undo move",
-                                           f"Undo this move?\n\n{move.date} · {move.route} · "
-                                           f"{move.amount}", "Undo"):
+        if not dialogs.confirm_destructive(self, tr("Undo move"),
+                                           tr("Undo this move?\n\n{0} · {1} · {2}", move.date, move.route, move.amount), tr("Undo")):
             return
         try:
             self._services.transfers.undo(transfer_id)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not undo the move", str(exc))
+            dialogs.show_warning(self, tr("Could not undo the move"), str(exc))
             return
         self.refresh()
-        self.notice.emit("Move undone", f"{move.amount} · {move.route}")
+        self.notice.emit(tr("Move undone"), f"{move.amount} · {move.route}")
 
     def restore(self, allocation_id: int) -> None:
         try:
             allocation = self._services.allocations.restore(allocation_id)
         except MoneyManagerError as exc:
-            dialogs.show_warning(self, "Could not restore the allocation", str(exc))
+            dialogs.show_warning(self, tr("Could not restore the allocation"), str(exc))
             return
         self.refresh()
-        self.notice.emit("Allocation restored", allocation.name)
+        self.notice.emit(tr("Allocation restored"), allocation.name)
 
     # Separate so tests can substitute non-modal fakes.
     def make_allocation_dialog(self) -> AllocationDialog:

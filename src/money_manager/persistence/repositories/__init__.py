@@ -16,6 +16,8 @@ from money_manager.persistence.repositories.category_rule_repository import (
 )
 from money_manager.persistence.repositories.goal_repository import GoalRepository
 from money_manager.persistence.repositories.investment_repository import InvestmentRepository
+from money_manager.persistence.repositories.debt_repository import DebtRepository
+from money_manager.persistence.repositories.receipt_repository import ReceiptRepository
 from money_manager.persistence.repositories.recurring_repository import RecurringRepository
 from money_manager.persistence.repositories.setting_repository import SettingRepository
 from money_manager.persistence.repositories.subscription_repository import (
@@ -34,6 +36,8 @@ __all__ = [
     "CategoryRuleRepository",
     "GoalRepository",
     "InvestmentRepository",
+    "DebtRepository",
+    "ReceiptRepository",
     "RecurringRepository",
     "SettingRepository",
     "SubscriptionRepository",

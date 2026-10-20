@@ -13,12 +13,13 @@ from money_manager.domain.subscriptions import (
 )
 from money_manager.ui.dashboard.view_model import StatView
 from money_manager.ui.formatting import format_date, format_money
+from money_manager.core.i18n import tr
 
 FREQUENCY_TEXT = {
-    Frequency.WEEKLY: "Weekly",
-    Frequency.MONTHLY: "Monthly",
-    Frequency.QUARTERLY: "Every 3 months",
-    Frequency.YEARLY: "Yearly",
+    Frequency.WEEKLY: tr("Weekly"),
+    Frequency.MONTHLY: tr("Monthly"),
+    Frequency.QUARTERLY: tr("Every 3 months"),
+    Frequency.YEARLY: tr("Yearly"),
 }
 PERIOD_TEXT = {
     Frequency.WEEKLY: "week",
@@ -26,7 +27,7 @@ PERIOD_TEXT = {
     Frequency.QUARTERLY: "quarter",
     Frequency.YEARLY: "year",
 }
-TABLE_HEADERS = ("Name", "Category", "Amount", "Frequency", "Per month", "Next payment", "Status")
+TABLE_HEADERS = (tr("Name"), tr("Category"), tr("Amount"), tr("Frequency"), tr("Per month"), tr("Next payment"), tr("Status"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,20 +53,20 @@ def subscription_row(
         FREQUENCY_TEXT[subscription.frequency],
         format_money(subscription.monthly_cost),
         format_date(next_date) + (" (overdue)" if overdue else ""),
-        "Active" if subscription.is_active else "Paused",
+        tr("Active") if subscription.is_active else tr("Paused"),
     )
 
 
 def upcoming_row(payment: UpcomingPayment) -> UpcomingRowView:
     days = payment.days_until
     if days < 0:
-        when = f"Overdue by {-days} {'day' if days == -1 else 'days'}"
+        when = tr("Overdue by {0} {1}", -days, tr("day") if days == -1 else tr("days"))
     elif days == 0:
-        when = "Due today"
+        when = tr("Due today")
     elif days == 1:
-        when = "Tomorrow"
+        when = tr("Tomorrow")
     else:
-        when = f"In {days} days"
+        when = tr("In {0} days", days)
     return UpcomingRowView(
         subscription_id=payment.subscription.id,
         due_date=payment.due_date,
@@ -82,21 +83,21 @@ def summary_stats(stats: SubscriptionStats) -> tuple[StatView, ...]:
     overdue = len(stats.overdue)
     top = stats.most_expensive
     return (
-        StatView("Monthly cost", format_money(stats.monthly_total),
-                 f"{format_money(stats.yearly_total)} per year"),
-        StatView("Active subscriptions", str(len(stats.active)),
+        StatView(tr("Monthly cost"), format_money(stats.monthly_total),
+                 tr("{0} per year", format_money(stats.yearly_total))),
+        StatView(tr("Active subscriptions"), str(len(stats.active)),
                  f"{stats.inactive_count} paused"),
         StatView(
-            f"Due in the next {stats.horizon_days} days",
+            tr("Due in the next {0} days", stats.horizon_days),
             format_money(stats.upcoming_total),
             f"{len(upcoming)} {'payment' if len(upcoming) == 1 else 'payments'}"
-            + (f" · {overdue} overdue" if overdue else ""),
+            + (tr(" · {0} overdue", overdue) if overdue else ""),
             "outflow" if overdue else "neutral",
         ),
         StatView(
-            "Most expensive",
+            tr("Most expensive"),
             top.name if top else "—",
-            f"{format_money(top.monthly_cost)} per month" if top else "No active subscriptions",
+            tr("{0} per month", format_money(top.monthly_cost)) if top else tr("No active subscriptions"),
         ),
     )
 

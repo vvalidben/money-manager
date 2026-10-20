@@ -17,6 +17,7 @@ Dashboard specifics
 from collections.abc import Callable, Sequence
 from datetime import date, timedelta
 
+from money_manager.core.i18n import tr
 from money_manager.domain.allocation import AVAILABLE_LABEL, AllocationBalance, AllocationSummary
 from money_manager.domain.analytics import (
     LedgerEntry,
@@ -255,7 +256,7 @@ class DashboardService:
         slices.append(
             AllocationSlice(
                 allocation_id=None,
-                name=AVAILABLE_LABEL,
+                name=tr(AVAILABLE_LABEL),
                 amount=summary.available,
                 share=ratio(summary.available, total) if total.is_positive() else None,
             )

@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+from money_manager.core.i18n import tr
 
 DATE_FORMATS = ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%y", "%Y/%m/%d",
                 "%m/%d/%Y")
@@ -155,7 +156,7 @@ def parse_amount(text: str) -> Decimal | None:
     if value.startswith(("-", "+")):
         negative, value = negative or value[0] == "-", value[1:]
     if not re.fullmatch(r"[0-9.,]+", value) or not re.search(r"[0-9]", value):
-        raise ValueError(f"'{text}' is not an amount")
+        raise ValueError(tr("'{0}' is not an amount", text))
     last_dot, last_comma = value.rfind("."), value.rfind(",")
     if last_dot >= 0 and last_comma >= 0:
         decimal_mark = "." if last_dot > last_comma else ","
@@ -174,9 +175,9 @@ def parse_amount(text: str) -> Decimal | None:
     try:
         amount = Decimal(value)
     except InvalidOperation as exc:
-        raise ValueError(f"'{text}' is not an amount") from exc
+        raise ValueError(tr("'{0}' is not an amount", text)) from exc
     if amount.as_tuple().exponent < -2:  # type: ignore[operator]
-        raise ValueError(f"'{text}' has more than two decimals")
+        raise ValueError(tr("'{0}' has more than two decimals", text))
     return -amount if negative else amount
 
 
@@ -209,12 +210,12 @@ def parse_statement(table: StatementTable, columns: StatementColumns,
     for offset, row in enumerate(table.rows):
         number = offset + 2  # the header is line 1
         if len(row) <= max(needed):
-            problems.append(StatementProblem(number, "The line has too few columns."))
+            problems.append(StatementProblem(number, tr("The line has too few columns.")))
             continue
         try:
             occurred_on = datetime.strptime(_date_text(row[columns.date]), date_format).date()
         except ValueError:
-            problems.append(StatementProblem(number, f"'{row[columns.date]}' is not a date."))
+            problems.append(StatementProblem(number, tr("'{0}' is not a date.", row[columns.date])))
             continue
         try:
             amount = _line_amount(row, columns)
@@ -222,7 +223,7 @@ def parse_statement(table: StatementTable, columns: StatementColumns,
             problems.append(StatementProblem(number, f"{str(exc).capitalize()}."))
             continue
         if amount is None or amount == 0:
-            problems.append(StatementProblem(number, "The line has no amount."))
+            problems.append(StatementProblem(number, tr("The line has no amount.")))
             continue
         description = " ".join(row[columns.description].split())
         lines.append(StatementLine(number, occurred_on, description, amount))

@@ -17,12 +17,13 @@ from money_manager.ui.formatting import (
     format_percent,
     format_signed_money,
 )
+from money_manager.core.i18n import tr
 
-MONTH_HEADERS = ("Month", "Income", "Expenses", "Invested", "Saved", "Savings rate",
-                 "Spending vs prev.")
-RECURRING_HEADERS = ("Expense", "Category", "Every", "Typical amount", "Per month",
-                     "Last paid", "Next expected")
-CADENCE_TEXT = {Cadence.WEEKLY: "Week", Cadence.MONTHLY: "Month"}
+MONTH_HEADERS = (tr("Month"), tr("Income"), tr("Expenses"), tr("Invested"), tr("Saved"), tr("Savings rate"),
+                 tr("Spending vs prev."))
+RECURRING_HEADERS = (tr("Expense"), tr("Category"), tr("Every"), tr("Typical amount"), tr("Per month"),
+                     tr("Last paid"), tr("Next expected"))
+CADENCE_TEXT = {Cadence.WEEKLY: tr("Week"), Cadence.MONTHLY: tr("Month")}
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,12 +42,11 @@ def build_statistics_view(report: StatisticsReport) -> StatisticsView:
     period, previous = report.period, report.previous_period
     return StatisticsView(
         period_label=f"{format_date(period.start)} – {format_date(period.end)} "
-                     f"({period.days} {'day' if period.days == 1 else 'days'})",
+                     f"({period.days} {tr('day') if period.days == 1 else tr('days')})",
         comparison_label=(
-            f"Changes compare with {format_date(previous.start)} – {format_date(previous.end)}"
+            tr("Changes compare with {0} – {1}", format_date(previous.start), format_date(previous.end))
             if report.comparison_complete
-            else f"No comparison: {format_date(previous.start)} – {format_date(previous.end)} "
-                 "is before tracking began"
+            else tr("No comparison: {0} – {1} is before tracking began", format_date(previous.start), format_date(previous.end))
         ),
         stats=_stats(report),
         balance_caption=(
@@ -68,66 +68,66 @@ def build_statistics_view(report: StatisticsReport) -> StatisticsView:
             for item in report.recurring
         ),
         recurring_caption=(
-            f"About {format_money(report.recurring_monthly_total)} per month in "
-            f"{len(report.recurring)} recurring {'expense' if len(report.recurring) == 1 else 'expenses'}"
-            " (detected from the last 12 months)"
+            tr("About {0} per month in {1} {2} (detected from the last 12 months)",
+               format_money(report.recurring_monthly_total), len(report.recurring),
+               tr("recurring expense") if len(report.recurring) == 1
+               else tr("recurring expenses"))
             if report.recurring
-            else "No regular weekly or monthly expenses detected in the last 12 months."
+            else tr("No regular weekly or monthly expenses detected in the last 12 months.")
         ),
     )
 
 
 def change_caption(change: Decimal | None, comparable: bool = True) -> str:
     if not comparable:
-        return "Previous period is before tracking began"
+        return tr("Previous period is before tracking began")
     if change is None:
-        return "Nothing to compare with in the previous period"
-    return f"{format_percent(change, signed=True)} vs previous period"
+        return tr("Nothing to compare with in the previous period")
+    return tr("{0} vs previous period", format_percent(change, signed=True))
 
 
 def _stats(report: StatisticsReport) -> tuple[StatView, ...]:
     totals = report.totals
     savings = totals.savings
     if totals.savings_rate is not None:
-        savings_caption = f"Savings rate {format_percent(totals.savings_rate)}"
+        savings_caption = tr("Savings rate {0}", format_percent(totals.savings_rate))
     else:
-        savings_caption = "No income in this period"
+        savings_caption = tr("No income in this period")
     if not report.has_investment_categories:
-        invest_caption = "Mark investment categories to track this"
+        invest_caption = tr("Mark investment categories to track this")
     elif totals.investment_rate is None:
-        invest_caption = "No income in this period"
+        invest_caption = tr("No income in this period")
     else:
-        invest_caption = f"Investment rate {format_percent(totals.investment_rate)} of income"
+        invest_caption = tr("Investment rate {0} of income", format_percent(totals.investment_rate))
     return (
-        StatView("Income", format_signed_money(totals.income),
+        StatView(tr("Income"), format_signed_money(totals.income),
                  change_caption(report.income_change, report.comparison_complete), "inflow"),
-        StatView("Expenses", format_signed_money(-totals.expenses),
+        StatView(tr("Expenses"), format_signed_money(-totals.expenses),
                  change_caption(report.expenses_change, report.comparison_complete), "outflow"),
-        StatView("Saved" if not savings.is_negative() else "Overspent",
+        StatView(tr("Saved") if not savings.is_negative() else tr("Overspent"),
                  format_signed_money(savings), savings_caption,
                  "outflow" if savings.is_negative() else "inflow"),
-        StatView("Invested", format_money(totals.investments), invest_caption, "neutral"),
-        StatView("Net change", format_signed_money(totals.net_change),
-                 f"Balance now {format_money(report.balance.closing)}",
+        StatView(tr("Invested"), format_money(totals.investments), invest_caption, "neutral"),
+        StatView(tr("Net change"), format_signed_money(totals.net_change),
+                 tr("Balance now {0}", format_money(report.balance.closing)),
                  "outflow" if totals.net_change.is_negative() else "neutral"),
     )
 
 
 def _trend_caption(report: StatisticsReport) -> str:
     trend = report.trend
-    average = f"Average {format_money(trend.average_per_day)} per day"
+    average = tr("Average {0} per day", format_money(trend.average_per_day))
     match trend.direction:
         case TrendDirection.NO_DATA:
-            return "No spending in this period"
+            return tr("No spending in this period")
         case TrendDirection.STABLE:
-            return f"{average} · stable (second half vs first half of the range)"
+            return tr("{0} · stable (second half vs first half of the range)", average)
         case TrendDirection.RISING if trend.change is None:
-            return f"{average} · rising (no spending in the first half)"
+            return tr("{0} · rising (no spending in the first half)", average)
         case _:
-            word = "rising" if trend.direction is TrendDirection.RISING else "falling"
+            word = tr("rising") if trend.direction is TrendDirection.RISING else tr("falling")
             assert trend.change is not None
-            return (f"{average} · {word} {format_percent(trend.change, signed=True)} "
-                    "(second half vs first half of the range)")
+            return (tr("{0} · {1} {2} (second half vs first half of the range)", average, word, format_percent(trend.change, signed=True)))
 
 
 def _month_row(report: StatisticsReport, index: int) -> tuple[str, ...]:
@@ -135,7 +135,7 @@ def _month_row(report: StatisticsReport, index: int) -> tuple[str, ...]:
     totals = summary.totals
     change = summary.spending_change
     return (
-        format_month(summary.month) + (" (to date)" if summary.is_partial else ""),
+        format_month(summary.month) + (tr(" (to date)") if summary.is_partial else ""),
         format_money(totals.income),
         format_money(totals.expenses),
         format_money(totals.investments),

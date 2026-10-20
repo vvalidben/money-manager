@@ -5,7 +5,7 @@ import sys
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QThreadPool
+from PySide6.QtCore import QLibraryInfo, QThreadPool, QTranslator
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
@@ -16,12 +16,14 @@ from money_manager.core.exception_hook import install_exception_hook
 from money_manager.core.logging_setup import configure_logging, shutdown_logging
 from money_manager.core.resources import resource_path
 from money_manager.core.cli import self_test_folder
+from money_manager.core.i18n import language, resolve_language, set_language
 from money_manager.persistence.database import Database
 from money_manager.services import AppServices
 from money_manager.services.data_service import ensure_daily_copy
 from money_manager.services.settings_service import SettingsService
 from money_manager.ui import dialogs, motion
 from money_manager.ui.theme import apply_theme, resolve_palette, use_palette
+from money_manager.core.i18n import tr
 
 # The windows, pages and charts are imported only once the colour palette is
 # chosen (see ``run``): the charts copy colour tokens when they are imported.
@@ -78,6 +80,16 @@ class WindowManager:
         return window
 
 
+def _install_qt_translation(app: QApplication, code: str) -> None:
+    """Qt's own texts (OK, Cancel, Yes, No …) in the interface language."""
+    translator = QTranslator(app)
+    folder = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    if translator.load(f"qtbase_{code}", folder):
+        app.installTranslator(translator)
+    else:
+        logger.info("Qt's %s translation is not available", code)
+
+
 def _set_windows_app_id() -> None:
     """Group the windows under Money Manager's own taskbar icon (not python.exe's)."""
     if sys.platform != "win32":
@@ -117,7 +129,7 @@ def run(argv: Sequence[str] | None = None) -> int:
         database = initialize_backend(config)
     except MoneyManagerError as exc:
         logger.critical("Startup failed: %s", exc, exc_info=True)
-        dialogs.show_error(None, f"{APP_NAME} could not start", str(exc))
+        dialogs.show_error(None, tr("{0} could not start", APP_NAME), str(exc))
         shutdown_logging()
         return 1
 
@@ -126,6 +138,9 @@ def run(argv: Sequence[str] | None = None) -> int:
     if palette != "dark":
         use_palette(palette)
         apply_theme(app)
+    # The language, like the palette, is chosen before any window is built.
+    if set_language(resolve_language(settings.language())) != "en":
+        _install_qt_translation(app, language())
     motion.set_user_enabled(settings.animations_enabled())
     if settings.daily_copies_enabled():
         try:

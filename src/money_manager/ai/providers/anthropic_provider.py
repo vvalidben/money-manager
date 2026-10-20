@@ -22,6 +22,7 @@ from money_manager.core.errors import (
     AIUnavailableError,
 )
 from money_manager.core.redaction import redact_secrets
+from money_manager.core.i18n import tr
 
 API_HOST = "api.anthropic.com"
 MAX_RETRIES = 1  # timeouts are retried too, so the worst case is 2 × the timeout
@@ -60,11 +61,11 @@ class AnthropicProvider(OnlineAIProvider):
     def _get_client(self) -> Any:
         if self._client_factory is None and not sdk_installed():
             raise AIUnavailableError(
-                "The online provider needs the optional 'anthropic' package. Install it with "
-                "pip install \"money-manager[ai-online]\".")
+                tr("The online provider needs the optional 'anthropic' package. Install it with "
+                "pip install \"money-manager[ai-online]\"."))
         if self._key is None:
             raise AIUnavailableError(
-                f"No Anthropic API key. Add one in Settings or set {ANTHROPIC_KEY_ENV}.")
+                tr("No Anthropic API key. Add one in Settings or set {0}.", ANTHROPIC_KEY_ENV))
         if self._client is None:
             factory = self._client_factory or _default_client
             self._client = factory(self._key, self._timeout)
@@ -81,8 +82,8 @@ class AnthropicProvider(OnlineAIProvider):
         except AIError as exc:
             return ProviderStatus(False, str(exc))
         if probe:
-            return ProviderStatus(True, f"Connected: {self.model} at {API_HOST}.")
-        return ProviderStatus(True, f"Configured: {self.model} at {API_HOST} (not contacted).")
+            return ProviderStatus(True, tr("Connected: {0} at {1}.", self.model, API_HOST))
+        return ProviderStatus(True, tr("Configured: {0} at {1} (not contacted).", self.model, API_HOST))
 
     def _complete(self, request: AIRequest) -> AIResponse:
         client = self._get_client()
@@ -98,11 +99,11 @@ class AnthropicProvider(OnlineAIProvider):
             message = stream.get_final_message()
 
         if message.stop_reason == "refusal":
-            raise AIResponseError("The provider declined to answer this request.")
+            raise AIResponseError(tr("The provider declined to answer this request."))
         text = "".join(block.text for block in message.content
                        if getattr(block, "type", None) == "text").strip()
         if not text:
-            raise AIResponseError("The provider returned an empty answer.")
+            raise AIResponseError(tr("The provider returned an empty answer."))
         return AIResponse(text=text, provider=self.name, model=str(message.model),
                           truncated=message.stop_reason == "max_tokens")
 
@@ -128,25 +129,22 @@ class _ErrorMapper:
 
         mapped: AIError | None = None
         if isinstance(exc, anthropic.AuthenticationError):
-            mapped = AIAuthenticationError("Anthropic rejected the API key. Check it in Settings.")
+            mapped = AIAuthenticationError(tr("Anthropic rejected the API key. Check it in Settings."))
         elif isinstance(exc, anthropic.PermissionDeniedError):
-            mapped = AIAuthenticationError("This API key is not allowed to use the model.")
+            mapped = AIAuthenticationError(tr("This API key is not allowed to use the model."))
         elif isinstance(exc, anthropic.NotFoundError):
-            mapped = AIUnavailableError(f"The model '{self._model}' was not found at Anthropic.")
+            mapped = AIUnavailableError(tr("The model '{0}' was not found at Anthropic.", self._model))
         elif isinstance(exc, anthropic.RateLimitError):
-            mapped = AIRateLimitError("Anthropic is receiving too many requests. Try again in "
-                                      "a minute.")
+            mapped = AIRateLimitError(tr("Anthropic is receiving too many requests. Try again in "
+                                      "a minute."))
         elif isinstance(exc, anthropic.BadRequestError):
-            mapped = AIResponseError("Anthropic could not process the request: "
-                                     f"{redact_secrets(exc.message)}")
+            mapped = AIResponseError(tr("Anthropic could not process the request: {0}", redact_secrets(exc.message)))
         elif isinstance(exc, anthropic.APIStatusError):
-            mapped = AIResponseError(f"Anthropic had a problem (HTTP {exc.status_code}). "
-                                     "Try again later.")
+            mapped = AIResponseError(tr("Anthropic had a problem (HTTP {0}). Try again later.", exc.status_code))
         elif isinstance(exc, anthropic.APITimeoutError):
-            mapped = AITimeoutError(f"Anthropic did not answer within {self._timeout} seconds.")
+            mapped = AITimeoutError(tr("Anthropic did not answer within {0} seconds.", self._timeout))
         elif isinstance(exc, anthropic.APIConnectionError):
-            mapped = AIUnavailableError(f"Could not reach {API_HOST}. Check the internet "
-                                        "connection.")
+            mapped = AIUnavailableError(tr("Could not reach {0}. Check the internet connection.", API_HOST))
         if mapped is None:
             return False
         raise mapped from exc

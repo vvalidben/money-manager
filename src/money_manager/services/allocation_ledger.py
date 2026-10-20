@@ -16,6 +16,7 @@ from money_manager.persistence.repositories import (
     AllocationRepository,
     TransactionRepository,
 )
+from money_manager.core.i18n import tr
 
 
 class AllocationLedger:
@@ -29,8 +30,7 @@ class AllocationLedger:
         for account in accounts:
             if account.currency != self._currency:
                 raise CurrencyMismatchError(
-                    f"Account '{account.name}' uses {account.currency}; allocations are "
-                    f"kept in {self._currency}."
+                    tr("Account '{0}' uses {1}; allocations are kept in {2}.", account.name, account.currency, self._currency)
                 )
         opening_total = sum(account.opening_balance_minor for account in accounts)
         transactions_total = TransactionRepository(self._session).signed_total_minor()
@@ -58,10 +58,10 @@ class AllocationLedger:
     def require_funds(self, source: Allocation | None, amount: Money) -> None:
         """Raise unless ``source`` (None = Available) holds at least ``amount``."""
         if source is None:
-            held, label = self.available(), AVAILABLE_LABEL
+            held, label = self.available(), tr(AVAILABLE_LABEL)
         else:
             held, label = self.balance_of(source.id), f"'{source.name}'"
         if held < amount:
             raise InsufficientFundsError(
-                f"{label} holds {held}; cannot move {amount}.", "amount"
+                tr("{0} holds {1}; cannot move {2}.", label, held, amount), "amount"
             )

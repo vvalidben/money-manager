@@ -45,11 +45,12 @@ from money_manager.ui.components import FormField
 from money_manager.ui.formatting import format_date, format_signed_money
 from money_manager.ui.theme import Spacing
 from money_manager.ui.transactions.transaction_dialog import side_by_side
+from money_manager.core.i18n import tr
 
 PREVIEW_LIMIT = 500
 FORMAT_LABELS = {"%d/%m/%Y": "31/12/2026", "%Y-%m-%d": "2026-12-31", "%d-%m-%Y": "31-12-2026",
                  "%d.%m.%Y": "31.12.2026", "%d/%m/%y": "31/12/26", "%Y/%m/%d": "2026/12/31",
-                 "%m/%d/%Y": "12/31/2026 (month first)"}
+                 "%m/%d/%Y": tr("12/31/2026 (month first)")}
 ONE_COLUMN, TWO_COLUMNS = "one", "two"
 
 
@@ -62,12 +63,12 @@ class ImportStatementDialog(QDialog):
         self._table = table
         self.preview: StatementPreview | None = None
         self.outcome: ImportOutcome | None = None
-        self.setWindowTitle(f"Import {path.name}")
+        self.setWindowTitle(tr("Import {0}", path.name))
         self.setModal(True)
         self.resize(860, 640)
 
-        intro = QLabel("Choose the account and check the columns. Lines already recorded in the "
-                       "account are skipped, so importing the same statement twice adds nothing.")
+        intro = QLabel(tr("Choose the account and check the columns. Lines already recorded in the "
+                       "account are skipped, so importing the same statement twice adds nothing."))
         intro.setObjectName("CardBody")
         intro.setWordWrap(True)
 
@@ -81,8 +82,8 @@ class ImportStatementDialog(QDialog):
         self.amount_combo = self._column_combo(header)
         self.debit_combo, self.credit_combo = self._column_combo(header), self._column_combo(header)
         self.mode_combo = QComboBox()
-        self.mode_combo.addItem("One column (minus = money out)", ONE_COLUMN)
-        self.mode_combo.addItem("Separate debit and credit columns", TWO_COLUMNS)
+        self.mode_combo.addItem(tr("One column (minus = money out)"), ONE_COLUMN)
+        self.mode_combo.addItem(tr("Separate debit and credit columns"), TWO_COLUMNS)
         self.format_combo = QComboBox()
         for fmt in DATE_FORMATS:
             self.format_combo.addItem(FORMAT_LABELS[fmt], fmt)
@@ -90,8 +91,8 @@ class ImportStatementDialog(QDialog):
         self.expense_combo = QComboBox()
         self.income_combo = QComboBox()
         expense_new, income_new = QToolButton(), QToolButton()
-        expense_new.setText("New…")
-        income_new.setText("New…")
+        expense_new.setText(tr("New…"))
+        income_new.setText(tr("New…"))
         expense_new.clicked.connect(lambda: self._new_category(CategoryKind.EXPENSE))
         income_new.clicked.connect(lambda: self._new_category(CategoryKind.INCOME))
         self._category_names = {c.id: c.name for c in
@@ -99,17 +100,17 @@ class ImportStatementDialog(QDialog):
         self._fill_categories()
 
         self.fields = {
-            "account_id": FormField("Into account", self.account_combo),
-            "date": FormField("Date column", self.date_combo),
-            "format": FormField("Date format", self.format_combo),
-            "description": FormField("Description column", self.description_combo),
-            "mode": FormField("Amounts", self.mode_combo),
-            "amount": FormField("Amount column", self.amount_combo),
-            "debit": FormField("Debit column (money out)", self.debit_combo),
-            "credit": FormField("Credit column (money in)", self.credit_combo),
-            "expense": FormField("Spending goes to", side_by_side(self.expense_combo, expense_new),
+            "account_id": FormField(tr("Into account"), self.account_combo),
+            "date": FormField(tr("Date column"), self.date_combo),
+            "format": FormField(tr("Date format"), self.format_combo),
+            "description": FormField(tr("Description column"), self.description_combo),
+            "mode": FormField(tr("Amounts"), self.mode_combo),
+            "amount": FormField(tr("Amount column"), self.amount_combo),
+            "debit": FormField(tr("Debit column (money out)"), self.debit_combo),
+            "credit": FormField(tr("Credit column (money in)"), self.credit_combo),
+            "expense": FormField(tr("Spending goes to"), side_by_side(self.expense_combo, expense_new),
                                  highlight=self.expense_combo),
-            "income": FormField("Income goes to", side_by_side(self.income_combo, income_new),
+            "income": FormField(tr("Income goes to"), side_by_side(self.income_combo, income_new),
                                 highlight=self.income_combo),
         }
         grid = QGridLayout()
@@ -122,8 +123,8 @@ class ImportStatementDialog(QDialog):
             grid.setColumnStretch(column, 1)
 
         self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["Line", "Date", "Description", "Amount", "Category",
-                                              "Status"])
+        self.table.setHorizontalHeaderLabels([tr("Line"), tr("Date"), tr("Description"), tr("Amount"), tr("Category"),
+                                              tr("Status")])
         self.table.verticalHeader().hide()
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -171,7 +172,7 @@ class ImportStatementDialog(QDialog):
     def _column_combo(header: list[str]) -> QComboBox:
         combo = QComboBox()
         for index, name in enumerate(header):
-            combo.addItem(name or f"Column {index + 1}", index)
+            combo.addItem(name or tr("Column {0}", index + 1), index)
         return combo
 
     def _apply_guess(self) -> None:
@@ -222,8 +223,8 @@ class ImportStatementDialog(QDialog):
                 combo.setCurrentIndex(combo.findData(wanted))
 
     def _new_category(self, kind: CategoryKind) -> None:
-        name, accepted = QInputDialog.getText(self, f"New {kind.value} category",
-                                              "Category name:")
+        name, accepted = QInputDialog.getText(self, tr("New {0} category", tr(kind.value)),
+                                              tr("Category name:"))
         if not accepted or not name.strip():
             return
         try:
@@ -240,7 +241,7 @@ class ImportStatementDialog(QDialog):
         self.form_error.hide()
         account_id = self.account_combo.currentData()
         if account_id is None:
-            self._error("Create an account first.")
+            self._error(tr("Create an account first."))
             self.import_button.setEnabled(False)
             return
         try:
@@ -251,7 +252,7 @@ class ImportStatementDialog(QDialog):
             return
         rows = [(str(p.line.row), format_date(p.line.occurred_on), p.line.description,
                  format_signed_money(Money(p.line.amount, self._services.base_currency)),
-                 self._category_text(p), "Already recorded" if p.duplicate else "New")
+                 self._category_text(p), tr("Already recorded") if p.duplicate else tr("New"))
                 for p in self.preview.lines]
         rows += [(str(p.row), "", "", "", "", p.message) for p in self.preview.problems]
         rows.sort(key=lambda r: int(r[0]))
@@ -265,12 +266,12 @@ class ImportStatementDialog(QDialog):
                 self.table.setItem(index, column, item)
         new = len(self.preview.new_lines)
         self.summary_label.setText(
-            f"{new} new · {self.preview.duplicate_count} already recorded · "
-            f"{len(self.preview.problems)} cannot be read"
-            + (f" · {self.preview.matched_count} sorted by your category rules"
+            tr("{0} new · {1} already recorded · {2} cannot be read", new, self.preview.duplicate_count, len(self.preview.problems))
+            + (tr(" · {0} sorted by your category rules", self.preview.matched_count)
                if self.preview.matched_count else "")
-            + (f" · showing the first {PREVIEW_LIMIT} lines" if len(rows) > PREVIEW_LIMIT else ""))
-        self.import_button.setText(f"Import {new} entr{'y' if new == 1 else 'ies'}")
+            + (tr(" · showing the first {0} lines", PREVIEW_LIMIT) if len(rows) > PREVIEW_LIMIT else ""))
+        self.import_button.setText(tr("Import 1 entry") if new == 1
+                                   else tr("Import {0} entries", new))
         self.import_button.setEnabled(new > 0)
 
     def _category_text(self, line: PreviewLine) -> str:
@@ -293,8 +294,8 @@ class ImportStatementDialog(QDialog):
             return False
         expense, income = self.expense_combo.currentData(), self.income_combo.currentData()
         if expense is None or income is None:
-            self._error("Choose a category for spending and for income (or create one with "
-                        "New…). You can change categories of single entries later.")
+            self._error(tr("Choose a category for spending and for income (or create one with "
+                        "New…). You can change categories of single entries later."))
             return False
         try:
             self.outcome = self._services.statements.import_lines(

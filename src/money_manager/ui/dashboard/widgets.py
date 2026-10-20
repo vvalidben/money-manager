@@ -24,6 +24,7 @@ from money_manager.ui.goals.view_model import GoalCardView
 from money_manager.ui.theme import Spacing, set_style_property
 from money_manager.ui.transactions.rows import TransactionRow
 from money_manager.ui.transactions.table_model import BADGE_SIZE, Column, TransactionTableModel
+from money_manager.core.i18n import tr
 
 ROW_HEIGHT = 40
 SHARE_BAR_STEPS = 1000
@@ -64,8 +65,8 @@ class AllocationOverview(Card):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent=parent)
-        self.body.addWidget(_CardHeader("Money organisation"))
-        self.body.addWidget(_label("How your total balance is allocated", "MutedLabel"))
+        self.body.addWidget(_CardHeader(tr("Money organisation")))
+        self.body.addWidget(_label(tr("How your total balance is allocated"), "MutedLabel"))
         self._grid = QGridLayout()
         self._grid.setHorizontalSpacing(Spacing.MD)
         self._grid.setVerticalSpacing(Spacing.SM)
@@ -112,8 +113,8 @@ class HealthCard(Card):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent=parent)
-        self.body.addWidget(_CardHeader("Financial health"))
-        self.body.addWidget(_label("Simple indicators based on your own data", "MutedLabel"))
+        self.body.addWidget(_CardHeader(tr("Financial health")))
+        self.body.addWidget(_label(tr("Simple indicators based on your own data"), "MutedLabel"))
         self._grid = QGridLayout()
         self._grid.setHorizontalSpacing(Spacing.MD)
         self._grid.setVerticalSpacing(2)
@@ -148,7 +149,7 @@ class RecentTransactions(Card):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent=parent)
-        header = _CardHeader("Recent transactions", "View all")
+        header = _CardHeader(tr("Recent transactions"), tr("View all"))
         assert header.action_button is not None
         self.view_all_button = header.action_button
         self.view_all_button.clicked.connect(self.view_all_requested)
@@ -174,7 +175,7 @@ class RecentTransactions(Card):
         for column in (Column.DATE, Column.CATEGORY, Column.AMOUNT):
             header_view.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
 
-        self.empty_label = _label("No transactions yet.", "MutedLabel")
+        self.empty_label = _label(tr("No transactions yet."), "MutedLabel")
         self.body.addWidget(self.table)
         self.body.addWidget(self.empty_label)
         self.body.addStretch(1)  # keep content at the top when the row is taller
@@ -196,7 +197,7 @@ class GoalsOverview(Card):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent=parent)
-        header = _CardHeader("Goals", "View all")
+        header = _CardHeader(tr("Goals"), tr("View all"))
         assert header.action_button is not None
         self.view_all_button = header.action_button
         self.view_all_button.clicked.connect(self.view_all_requested)
@@ -206,7 +207,7 @@ class GoalsOverview(Card):
         self._grid.setVerticalSpacing(Spacing.XS)
         self.body.addLayout(self._grid)
         self.empty_label = _label(
-            "No goals yet. Create one to set money aside for something that matters.",
+            tr("No goals yet. Create one to set money aside for something that matters."),
             "MutedLabel",
         )
         self.empty_label.setWordWrap(True)
@@ -247,9 +248,9 @@ class RenewingSoon(Card):
         self.body.setSpacing(Spacing.XS)
 
         header = QHBoxLayout()
-        header.addWidget(_label("Renewing soon", "TileHeading"))
+        header.addWidget(_label(tr("Renewing soon"), "TileHeading"))
         header.addStretch(1)
-        self.view_all_button = QPushButton("All subscriptions")
+        self.view_all_button = QPushButton(tr("All subscriptions"))
         self.view_all_button.setObjectName("TilePill")
         self.view_all_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.view_all_button.clicked.connect(self.view_all_requested)
@@ -260,7 +261,7 @@ class RenewingSoon(Card):
         self._rows = QVBoxLayout()
         self._rows.setSpacing(0)
         self.body.addLayout(self._rows)
-        self.empty_label = _label("No payments due in the next 30 days.", "TileMuted")
+        self.empty_label = _label(tr("No payments due in the next 30 days."), "TileMuted")
         self.body.addWidget(self.empty_label)
         self.body.addStretch(1)
         self.rows: tuple[RenewalView, ...] = ()
