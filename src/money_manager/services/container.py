@@ -24,11 +24,13 @@ from money_manager.services.category_service import CategoryService
 from money_manager.services.data_service import DataService
 from money_manager.services.debt_service import DebtService
 from money_manager.services.dashboard_service import DashboardService
+from money_manager.services.forecast_service import ForecastService
 from money_manager.services.goal_service import GoalService
 from money_manager.services.investment_service import InvestmentService
 from money_manager.services.net_worth_service import NetWorthService
 from money_manager.services.receipt_service import ReceiptService
 from money_manager.services.recurring_service import RecurringService
+from money_manager.services.reminder_service import ReminderService
 from money_manager.services.report_service import ReportService
 from money_manager.services.settings_service import SettingsService
 from money_manager.services.statement_import_service import StatementImportService
@@ -61,6 +63,8 @@ class AppServices:
     debts: DebtService
     receipts: ReceiptService
     updates: UpdateService
+    forecast: ForecastService
+    reminders: ReminderService
     analysis: FinancialAnalysisService
     ai: AIService
     settings: SettingsService
@@ -102,6 +106,15 @@ class AppServices:
         goals = GoalService(database, today=today, base_currency=base_currency)
         net_worth = NetWorthService(database, balances, investments, today=today,
                                     base_currency=base_currency)
+        recurring = RecurringService(database, transactions, today=today,
+                                     base_currency=base_currency)
+        subscriptions = SubscriptionService(database, transactions, today=today,
+                                            base_currency=base_currency)
+        debts = DebtService(database, transactions, today=today, base_currency=base_currency)
+        forecast = ForecastService(accounts=accounts, balances=balances, recurring=recurring,
+                                   subscriptions=subscriptions, debts=debts,
+                                   statistics=statistics, today=today,
+                                   base_currency=base_currency)
         allocations = AllocationService(database, balances, today=today,
                                         base_currency=base_currency)
         return cls(
@@ -120,16 +133,17 @@ class AppServices:
             dashboard=DashboardService(database, today=today, base_currency=base_currency),
             statistics=statistics,
             goals=goals,
-            subscriptions=SubscriptionService(
-                database, transactions, today=today, base_currency=base_currency
-            ),
+            subscriptions=subscriptions,
             investments=investments,
             net_worth=net_worth,
-            recurring=RecurringService(database, transactions, today=today,
-                                       base_currency=base_currency),
-            debts=DebtService(database, transactions, today=today, base_currency=base_currency),
+            recurring=recurring,
+            debts=debts,
             receipts=ReceiptService(database),
             updates=UpdateService(settings, today=today),
+            forecast=forecast,
+            reminders=ReminderService(settings=settings, subscriptions=subscriptions,
+                                      budgets=budgets, debts=debts, forecast=forecast,
+                                      today=today),
             reports=ReportService(accounts=accounts, categories=categories,
                                   transactions=transactions, statistics=statistics,
                                   budgets=budgets, goals=goals, net_worth=net_worth,

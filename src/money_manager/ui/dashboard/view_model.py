@@ -219,7 +219,7 @@ def renewal_views(payments: Sequence[UpcomingPayment], limit: int = 4) -> tuple[
 
 def _when(days: int) -> str:
     if days < 0:
-        return tr("Overdue by {0} day{1}", -days, '' if days == -1 else 's')
+        return tr("Overdue by 1 day") if days == -1 else tr("Overdue by {0} days", -days)
     if days == 0:
         return tr("Today")
     if days == 1:

@@ -4,10 +4,12 @@ from bisect import bisect_left
 from collections.abc import Sequence
 
 from matplotlib.backend_bases import MouseEvent
-from matplotlib.dates import AutoDateLocator, ConciseDateFormatter, date2num
+from matplotlib.dates import AutoDateLocator, ConciseDateFormatter, date2num, num2date
+from matplotlib.ticker import FuncFormatter
 
 from money_manager.domain.analytics import BalancePoint
 from money_manager.domain.dashboard import CategorySpending, MonthlyFlow
+from money_manager.domain.forecast import Forecast
 from money_manager.domain.investments import NetWorthPoint
 from money_manager.ui.charts.base import (
     AXIS_COLOR,
@@ -172,6 +174,83 @@ class NetWorthChart(ChartCanvas):
             return None
         return net_worth_text(self._points[min(max(round(event.xdata), 0),
                                                 len(self._points) - 1)])
+
+
+class ForecastChart(ChartCanvas):
+    """The projected balance day by day; dots mark scheduled income and payments."""
+
+    def __init__(self, height_px: int = 220) -> None:
+        super().__init__(height_px)
+        self._forecast: Forecast | None = None
+        self._xs: list[float] = []
+
+    def render(self, forecast: Forecast | None) -> None:
+        self._forecast, self._xs = None, []
+        if forecast is None or len(forecast.points) < 2:
+            self.show_message(tr("The forecast appears once you have an account"))
+            return
+        self.reset()
+        ax = self.axes
+        xs = [date2num(p.day) for p in forecast.points]
+        ys = [plot_value(p.balance) for p in forecast.points]
+        ax.plot(xs, ys, color=BALANCE_COLOR, linewidth=2, solid_joinstyle="round",
+                label=tr("Projected balance"))
+        if min(ys) < 0:
+            ax.fill_between(xs, ys, 0, where=[y < 0 for y in ys], color=EXPENSE_COLOR,
+                            alpha=0.25, linewidth=0, interpolate=True)
+        if min(ys) < 0 < max(ys):
+            ax.axhline(0, color=AXIS_COLOR, linewidth=1)
+        by_day = {p.day: plot_value(p.balance) for p in forecast.points}
+        for event in forecast.events:
+            colour = INCOME_COLOR if event.amount.is_positive() else EXPENSE_COLOR
+            ax.plot([date2num(event.day)], [by_day[event.day]], marker="o", markersize=4,
+                    color=colour, linestyle="none", zorder=3)
+        locator = AutoDateLocator(minticks=3, maxticks=7)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _p: month_abbreviation(
+            num2date(x).date())))
+        money_axis(ax.yaxis)
+        ax.set_xlim(xs[0], xs[-1])
+        self._forecast, self._xs = forecast, xs
+        self.draw_idle()
+
+    def hover_text(self, event: MouseEvent) -> str | None:
+        """The nearest day: projected balance and what is scheduled that day."""
+        if event.inaxes is not self.axes or event.xdata is None or self._forecast is None:
+            return None
+        index = min(bisect_left(self._xs, event.xdata), len(self._xs) - 1)
+        point = self._forecast.points[index]
+        lines = [format_date(point.day), tr("Projected balance: {0}", format_money(point.balance))]
+        lines += [f"{e.label}: {format_signed_money(e.amount)}" for e in self._forecast.events
+                  if e.day == point.day]
+        return "\n".join(lines)
+
+
+def forecast_table(forecast: Forecast | None) -> TableData:
+    headers = [tr("Date"), tr("What"), tr("Amount"), tr("Balance after")]
+    if forecast is None:
+        return headers, []
+    return headers, [[format_date(e.day), e.label, format_signed_money(e.amount),
+                      format_money(forecast.balance_after(e))] for e in forecast.events]
+
+
+def forecast_note(forecast: Forecast | None) -> tuple[str, bool]:
+    """A sentence under the chart, and whether it is a warning."""
+    if forecast is None:
+        return "", False
+    basis = (tr("Based on your scheduled entries, subscriptions and loans only (no complete "
+                "month of history yet).") if forecast.history_months == 0 else
+             tr("Usual income {0} and spending {1} a month (last {2} complete months), plus "
+                "everything scheduled.", format_money(forecast.usual_income),
+                format_money(forecast.usual_spending), forecast.history_months))
+    low = forecast.first_below_zero
+    if low is not None:
+        return (tr("Money gets tight around {0}: the balance is projected at {1}.",
+                   format_date(low.day), format_money(low.balance)) + " " + basis, True)
+    lowest = forecast.lowest
+    return (tr("Lowest point: {0} on {1}. On {2}: {3}.", format_money(lowest.balance),
+               format_date(lowest.day), format_date(forecast.end),
+               format_money(forecast.closing)) + " " + basis, False)
 
 
 def band_label(points: Sequence[NetWorthPoint]) -> str | None:

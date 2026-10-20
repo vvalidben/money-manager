@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 from money_manager.ai.context import FinancialContext
 from money_manager.core.i18n import language
+
+ANSWER_LANGUAGES = {"fr": "French", "ar": "Arabic"}
 from money_manager.core.errors import ValidationError
 from money_manager.domain.insights import InsightKind
 
@@ -107,6 +109,7 @@ def build_request(context: FinancialContext, kind: InsightKind = InsightKind.INS
         ask = f"Task: {TASKS[kind]}"
     user = f"<financial_analysis>\n{context.text}\n</financial_analysis>\n\n{ask}"
     system = SYSTEM_PROMPT
-    if language() == "fr":
-        system += "\n- Write your whole answer in French (the user reads the app in French)."
+    if language() in ANSWER_LANGUAGES:
+        name = ANSWER_LANGUAGES[language()]
+        system += f"\n- Write your whole answer in {name} (the user reads the app in {name})."
     return AIRequest(system=system, user=user)

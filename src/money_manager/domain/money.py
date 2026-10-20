@@ -17,7 +17,7 @@ from functools import total_ordering
 from typing import Self
 
 from money_manager.core.errors import CurrencyMismatchError, ValidationError
-from money_manager.core.i18n import language, tr
+from money_manager.core.i18n import comma_decimals, tr
 
 DEFAULT_CURRENCY = "MAD"
 MINOR_UNIT_DIGITS = 2
@@ -194,7 +194,7 @@ class Money:
 
     def __str__(self) -> str:
         text = f"{self.amount:,.2f}"
-        if language() == "fr":  # 12 000,50 MAD
+        if comma_decimals():  # 12 000,50 MAD
             text = text.replace(",", " ").replace(".", ",")
         return f"{text} {self.currency}"
 

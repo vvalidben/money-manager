@@ -3,7 +3,7 @@
 import logging
 
 from PySide6.QtCore import QEvent, QObject, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QKeySequence, QShortcut, QShowEvent
+from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut, QShowEvent
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -19,6 +19,7 @@ from money_manager import APP_NAME
 from money_manager.core.config import AppConfig
 from money_manager.core.errors import MoneyManagerError
 from money_manager.domain.recurring import RecordOutcome
+from money_manager.domain.reminders import Reminder
 from money_manager.services.update_service import UpdateInfo
 from money_manager.ui.ai.background import BackgroundCall, run_in_background
 from money_manager.services import AppServices
@@ -31,7 +32,9 @@ from money_manager.ui.components.toast import Toast
 from money_manager.ui.dashboard.dashboard_page import DashboardPage
 from money_manager.ui.goals.goals_page import GoalsPage
 from money_manager.ui.investments.investments_page import InvestmentsPage
+from money_manager.ui.formatting import format_date, format_money
 from money_manager.ui.lock.app_lock import AppLock
+from money_manager.ui.tray import TrayController
 from money_manager.ui.navigation import (
     ICON_PATHS,
     PLUS_PATH,
@@ -71,7 +74,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_WINDOW_SIZE = QSize(1200, 760)
 MINIMUM_WINDOW_SIZE = QSize(960, 600)
 RECURRING_CHECK_MS = 60 * 60 * 1000  # recurring entries due are recorded hourly
-UPDATE_CHECK_DELAY_MS = 8000  # the opt-in update check waits until the window has settled
+UPDATE_CHECK_DELAY_MS = 8000
+REMINDER_DELAY_MS = 15_000  # reminders wait until the window has settled
+MAX_REMINDERS_AT_ONCE = 3  # the opt-in update check waits until the window has settled
 
 
 class MainWindow(QMainWindow):
@@ -150,10 +155,22 @@ class MainWindow(QMainWindow):
         self.recurring_timer = QTimer(self)
         self.recurring_timer.setInterval(RECURRING_CHECK_MS)
         self.recurring_timer.timeout.connect(self.record_recurring)
+        self.recurring_timer.timeout.connect(self.check_reminders)
         self.recurring_timer.start()
         QTimer.singleShot(0, self.record_recurring)
         self._update_call: BackgroundCall | None = None
         QTimer.singleShot(UPDATE_CHECK_DELAY_MS, self.check_for_updates)
+
+        # Reminders and the notification-area icon.
+        self._quitting = False
+        self._told_about_tray = False
+        self.tray = TrayController(self)
+        self.tray.open_requested.connect(self.open_from_tray)
+        self.tray.lock_requested.connect(self.lock)
+        self.tray.quit_requested.connect(self.quit_app)
+        settings_page.notifications_changed.connect(self.update_tray)
+        self.update_tray()
+        QTimer.singleShot(REMINDER_DELAY_MS, self.check_reminders)
 
     def lock(self) -> None:
         self.app_lock.lock()
@@ -335,6 +352,65 @@ class MainWindow(QMainWindow):
         # After the layout has settled: tiles rise in, figures count, bars fill.
         QTimer.singleShot(0, page, page.play_entrance)
         logger.debug("Showing page %s", key)
+
+    # ---------------------------------------------------------- reminders and tray
+
+    def update_tray(self) -> None:
+        """The icon shows while reminders or keep-in-tray are on."""
+        try:
+            settings = self._services.settings
+            wanted = settings.reminders_enabled() or settings.keep_in_tray()
+        except MoneyManagerError:
+            wanted = False
+        self.tray.set_visible(wanted)
+
+    def check_reminders(self) -> list[Reminder]:
+        """Show the reminders not shown before (as notifications, or in the window)."""
+        try:
+            due = self._services.reminders.due(format_money, format_date)
+        except MoneyManagerError as exc:
+            logger.warning("Could not check reminders: %s", exc)
+            return []
+        shown = due[:MAX_REMINDERS_AT_ONCE]
+        for reminder in shown:
+            if self.tray.available:
+                self.tray.notify(reminder)
+        if shown and not self.tray.available and self.isVisible():
+            self._show_notice(shown[0].title, shown[0].body)
+        try:
+            self._services.reminders.mark_shown(due)
+        except MoneyManagerError as exc:
+            logger.warning("Could not remember the reminders: %s", exc)
+        return shown
+
+    def open_from_tray(self, page_key: str) -> None:
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        if page_key:
+            self.show_page(page_key)
+
+    def quit_app(self) -> None:
+        self._quitting = True
+        QApplication.quit()
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
+        """With keep-in-tray on, closing hides the window (and locks it when the lock is on)."""
+        try:
+            keep = self.tray.available and self._services.settings.keep_in_tray()
+        except MoneyManagerError:
+            keep = False
+        if keep and not self._quitting:
+            event.ignore()
+            self.hide()
+            self.app_lock.lock()
+            if not self._told_about_tray:
+                self._told_about_tray = True
+                self.tray.message(tr("Money Manager is still running"),
+                                  tr("It keeps reminding you here. Right-click the icon to "
+                                     "quit."))
+            return
+        super().closeEvent(event)
 
     def showEvent(self, event: QShowEvent) -> None:  # noqa: N802
         super().showEvent(event)

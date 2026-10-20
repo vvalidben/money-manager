@@ -765,6 +765,9 @@ def build_stylesheet() -> str:
     #AllocationAmount[tone="outflow"] {{
         color: {c.ERROR_TEXT};
     }}
+    #MutedLabel[tone="warning"] {{
+        color: {c.WARNING_TEXT};
+    }}
     #GoalBar, #ShareBar, #ShareBarAvailable {{
         border: none;
         border-radius: 4px;

@@ -11,7 +11,7 @@ import logging
 import platform
 import sqlite3
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from money_manager import APP_NAME, __version__
@@ -36,6 +36,10 @@ LOCK_AFTER_KEY = "lock_after_minutes"
 THEME_KEY = "theme"
 UPDATE_CHECK_KEY = "update_check"
 LANGUAGE_KEY = "language"
+REMINDERS_KEY = "reminders"
+KEEP_IN_TRAY_KEY = "keep_in_tray"
+SHOWN_REMINDERS_KEY = "shown_reminders"
+SHOWN_REMINDERS_KEPT_DAYS = 60
 LAST_UPDATE_CHECK_KEY = "last_update_check"
 
 LOCK_AFTER_CHOICES = (1, 5, 15, 30, 0)  # minutes without use; 0 = only when asked
@@ -165,6 +169,38 @@ class SettingsService:
             SettingRepository(session).set(LANGUAGE_KEY, json.dumps(choice))
         logger.info("Language set to %s", choice)
         return choice
+
+    # ------------------------------------------------------------ reminders
+
+    def reminders_enabled(self) -> bool:
+        """Notifications for payments due, budgets, loans and a low forecast (on by default)."""
+        return self._flag(REMINDERS_KEY, "reminders")
+
+    def set_reminders_enabled(self, enabled: bool) -> bool:
+        return self._set_flag(REMINDERS_KEY, "Reminders", enabled)
+
+    def keep_in_tray(self) -> bool:
+        """Closing the window keeps Money Manager in the notification area (off by default)."""
+        return self._flag(KEEP_IN_TRAY_KEY, "keep in tray", default=False)
+
+    def set_keep_in_tray(self, enabled: bool) -> bool:
+        return self._set_flag(KEEP_IN_TRAY_KEY, "Keep in tray", enabled)
+
+    def shown_reminders(self) -> dict[str, str]:
+        """Reminder keys already shown, with the day they were shown (ISO)."""
+        value = self._stored(SHOWN_REMINDERS_KEY, "shown reminders")
+        if not isinstance(value, dict):
+            return {}
+        return {k: v for k, v in value.items() if isinstance(k, str) and isinstance(v, str)}
+
+    def mark_reminders_shown(self, keys: list[str], today: date) -> None:
+        """Remember ``keys``; entries older than ``SHOWN_REMINDERS_KEPT_DAYS`` are dropped."""
+        shown = self.shown_reminders()
+        cutoff = (today - timedelta(days=SHOWN_REMINDERS_KEPT_DAYS)).isoformat()
+        shown = {k: v for k, v in shown.items() if v >= cutoff}
+        shown.update({key: today.isoformat() for key in keys})
+        with self._database.session() as session:
+            SettingRepository(session).set(SHOWN_REMINDERS_KEY, json.dumps(shown))
 
     # -------------------------------------------------------------- updates
 

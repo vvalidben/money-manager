@@ -8,12 +8,13 @@ language is read on every call, so nothing depends on when a module was imported
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-from money_manager.core.i18n import language, tr
+from money_manager.core.i18n import comma_decimals, is_right_to_left, tr, trc
 from money_manager.domain.enums import TransactionType
 from money_manager.domain.money import Money
 
 MINUS_SIGN = "−"
 NO_BREAK_SPACE = "\u00a0"
+LEFT_TO_RIGHT_MARK = "\u200e"
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 TYPE_LABELS = {  # English; shown through tr()
@@ -30,7 +31,7 @@ def _month(number: int) -> str:
 
 def _localise(text: str) -> str:
     """English digits (``12,000.5``) in the interface language's style."""
-    if language() == "fr":
+    if comma_decimals():
         return text.replace(",", NO_BREAK_SPACE).replace(".", ",")
     return text
 
@@ -40,16 +41,22 @@ def format_amount(amount: Decimal) -> str:
     return _localise(f"{amount:,.2f}")
 
 
+def _left_to_right(text: str) -> str:
+    """In a right-to-left interface, keep a figure's sign, digits and currency in order."""
+    return f"{LEFT_TO_RIGHT_MARK}{text}{LEFT_TO_RIGHT_MARK}" if is_right_to_left() else text
+
+
 def format_money(money: Money) -> str:
     """``12,000.00 MAD``; negative values use a real minus sign."""
     sign = MINUS_SIGN if money.is_negative() else ""
-    space = NO_BREAK_SPACE if language() == "fr" else " "
-    return f"{sign}{format_amount(abs(money.amount))}{space}{money.currency}"
+    space = NO_BREAK_SPACE if comma_decimals() else " "
+    return _left_to_right(f"{sign}{format_amount(abs(money.amount))}{space}{money.currency}")
 
 
 def format_signed_money(money: Money) -> str:
     """Like ``format_money`` but always shows ``+`` for positive values."""
-    return ("+" if money.is_positive() else "") + format_money(money)
+    text = format_money(money).strip(LEFT_TO_RIGHT_MARK)
+    return _left_to_right(("+" if money.is_positive() else "") + text)
 
 
 def format_date(value: date) -> str:
@@ -77,7 +84,7 @@ def format_percent(fraction: Decimal, *, signed: bool = False) -> str:
     """A fraction (0.3817) as ``38.2%``; ``signed`` adds ``+`` to positive values."""
     percent = (fraction * 100).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
     sign = MINUS_SIGN if percent < 0 else ("+" if signed and percent > 0 else "")
-    if language() == "fr":
+    if comma_decimals():
         return f"{sign}{_localise(str(abs(percent)))}{NO_BREAK_SPACE}%"
     return f"{sign}{abs(percent)}%"
 
@@ -95,4 +102,4 @@ def format_compact_amount(value: Decimal) -> str:
 
 
 def type_label(transaction_type: TransactionType) -> str:
-    return tr(TYPE_LABELS[transaction_type])
+    return trc("type", TYPE_LABELS[transaction_type])

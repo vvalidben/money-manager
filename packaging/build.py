@@ -54,6 +54,60 @@ def clean() -> None:
         shutil.rmtree(cache, ignore_errors=True)
 
 
+# ------------------------------------------------------------------ signing
+#
+# Signing removes Windows' "unknown publisher" warning. It needs a code-signing
+# certificate (bought from a certificate authority); without one the build is
+# simply not signed. Configure it with environment variables — never in files:
+#   MM_SIGN_CERT       path to a .pfx certificate file, with MM_SIGN_PASSWORD, or
+#   MM_SIGN_THUMBPRINT the SHA-1 thumbprint of a certificate installed in Windows
+#   MM_SIGNTOOL        signtool.exe (default: the newest one in the Windows SDK)
+#   MM_SIGN_TIMESTAMP  RFC 3161 timestamp server (default: DigiCert's)
+
+DEFAULT_TIMESTAMP = "http://timestamp.digicert.com"
+
+
+def find_signtool(environ: dict[str, str]) -> Path | None:
+    if environ.get("MM_SIGNTOOL"):
+        return Path(environ["MM_SIGNTOOL"])
+    kits = Path(environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Windows Kits" / "10" / "bin"
+    tools = sorted(kits.glob("10.*/x64/signtool.exe")) if kits.is_dir() else []
+    return tools[-1] if tools else None
+
+
+def signing_command(environ: dict[str, str], target: Path) -> list[str] | None:
+    """The signtool command for ``target``, or None when signing is not configured."""
+    if environ.get("MM_SIGN_CERT"):
+        identity = ["/f", environ["MM_SIGN_CERT"]]
+        if environ.get("MM_SIGN_PASSWORD"):
+            identity += ["/p", environ["MM_SIGN_PASSWORD"]]
+    elif environ.get("MM_SIGN_THUMBPRINT"):
+        identity = ["/sha1", environ["MM_SIGN_THUMBPRINT"]]
+    else:
+        return None
+    tool = find_signtool(environ)
+    if tool is None:
+        raise SystemExit("Signing is configured but signtool.exe was not found "
+                         "(install the Windows SDK or set MM_SIGNTOOL).")
+    timestamp = environ.get("MM_SIGN_TIMESTAMP") or DEFAULT_TIMESTAMP
+    return [str(tool), "sign", "/fd", "SHA256", "/tr", timestamp, "/td", "SHA256",
+            *identity, "/d", "Money Manager", str(target)]
+
+
+def sign(target: Path) -> bool:
+    """Sign ``target`` when a certificate is configured; True when it was signed."""
+    command = signing_command(dict(os.environ), target)
+    if command is None:
+        print(f"   not signed: {target.name} (no certificate configured)")
+        return False
+    # The command holds the certificate password: never print it.
+    result = subprocess.run(command, check=False, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise SystemExit(f"Signing {target.name} failed (signtool exit {result.returncode}).")
+    print(f"   signed: {target.name}")
+    return True
+
+
 def pyinstaller() -> None:
     step("Running PyInstaller")
     subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean",
@@ -130,6 +184,7 @@ def installer(release_version: str, archive: Path) -> Path:
         raise SystemExit(f"PyInstaller did not produce {built}")
     setup = RELEASE / built.name
     shutil.copy2(built, setup)
+    sign(setup)
 
     step("Checking the installer (quiet install into a temporary folder)")
     target = Path(tempfile.mkdtemp(prefix="moneymanager-setup-")) / "MoneyManager"
@@ -161,6 +216,8 @@ def main() -> None:
     release_version = version()
     clean()
     pyinstaller()
+    step("Signing")
+    sign(EXE)
     add_documents()
     if not arguments.skip_self_test:
         self_test()

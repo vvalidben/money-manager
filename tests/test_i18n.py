@@ -13,7 +13,10 @@ from PySide6.QtWidgets import QApplication
 
 from money_manager.core import i18n
 from money_manager.core.i18n import resolve_language, set_language, tr
+from money_manager.core.locales.ar import CATALOG as ARABIC
 from money_manager.core.locales.fr import CATALOG
+
+CATALOGS = {"fr": CATALOG, "ar": ARABIC}
 from money_manager.domain.money import Money
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "money_manager"
@@ -52,14 +55,21 @@ def french() -> Iterator[None]:
     set_language("en")
 
 
-def test_every_text_has_a_french_translation() -> None:
-    missing = sorted(t for t in source_texts() - UNTRANSLATED if t not in CATALOG)
+@pytest.mark.parametrize("code", sorted(CATALOGS))
+def test_every_text_has_a_translation(code: str) -> None:
+    missing = sorted(t for t in source_texts() - UNTRANSLATED if t not in CATALOGS[code])
     assert missing == []
 
 
-def test_translations_keep_their_placeholders() -> None:
-    wrong = [english for english, french in CATALOG.items() if fields(english) != fields(french)]
+@pytest.mark.parametrize("code", sorted(CATALOGS))
+def test_translations_keep_their_placeholders(code: str) -> None:
+    wrong = [english for english, text in CATALOGS[code].items()
+             if fields(english.split("|", 1)[-1]) != fields(text)]
     assert wrong == []
+
+
+def test_both_languages_translate_the_same_texts() -> None:
+    assert set(CATALOG) == set(ARABIC)
 
 
 def test_english_is_the_default_and_unchanged() -> None:
@@ -122,3 +132,61 @@ def test_every_page_opens_in_french(french: None, qapp: QApplication, app_config
         assert window.page("transactions").add_button.text() == "Ajouter une opération"
     finally:
         window.close()
+
+
+
+@pytest.fixture
+def arabic() -> Iterator[None]:
+    set_language("ar")
+    yield
+    set_language("en")
+
+
+def test_arabic_texts_and_formats(arabic: None) -> None:
+    from money_manager.core.i18n import is_right_to_left
+    from money_manager.ui.formatting import format_date, format_money, format_percent
+
+    assert is_right_to_left()
+    assert tr("Settings") == "الإعدادات"
+    # Western digits, kept left to right inside Arabic text.
+    assert format_money(Money.of("-12000.5")) == "\u200e−12\u00a0000,50\u00a0MAD\u200e"
+    assert format_percent(Decimal("0.382")) == "38,2\u00a0%"
+    assert format_date(date(2026, 8, 5)) == "05 غشت 2026"  # Moroccan month names
+
+
+def test_every_page_opens_in_arabic(arabic: None, qapp: QApplication, app_config,  # noqa: ANN001
+                                    app_services) -> None:  # noqa: ANN001
+    from PySide6.QtCore import Qt
+
+    from money_manager.ui.main_window import MainWindow
+    from money_manager.ui.pages import PAGES
+
+    app_services.accounts.create("Bank", opening_balance="100", opening_date=date(2026, 1, 1))
+    qapp.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+    window = MainWindow(app_config, app_services)
+    window.resize(1200, 800)
+    window.show()
+    try:
+        for spec in PAGES:
+            window.show_page(spec.key)
+            QApplication.processEvents()
+        assert window.page("transactions").add_button.text() == "إضافة عملية"
+        rail = window.sidebar
+        assert rail.geometry().right() == window.centralWidget().width() - 1  # right edge
+    finally:
+        window.close()
+        qapp.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+
+
+def test_reports_in_arabic(arabic: None, qapp: QApplication, app_services,  # noqa: ANN001
+                           tmp_path: Path) -> None:
+    from money_manager.ui.reports.monthly_pdf import report_html, write_monthly_report
+    from money_manager.ui.reports.yearly_pdf import write_yearly_report
+
+    app_services.accounts.create("Bank", opening_balance="100", opening_date=date(2026, 1, 1))
+    report = app_services.reports.monthly(date(2026, 5, 1))
+    assert "dir='rtl'" in report_html(report) and "الملخص" in report_html(report)
+    write_monthly_report(report, tmp_path / "month.pdf")
+    write_yearly_report(app_services.reports.yearly(2026), tmp_path / "year.pdf")
+    assert (tmp_path / "month.pdf").read_bytes().startswith(b"%PDF")
+    assert (tmp_path / "year.pdf").read_bytes().startswith(b"%PDF")

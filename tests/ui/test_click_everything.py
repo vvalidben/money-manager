@@ -141,15 +141,16 @@ def test_every_button_with_data(window: MainWindow, app_services: AppServices,
     assert slot_errors == []
 
 
-def test_every_button_in_french(window: MainWindow, app_services: AppServices,
-                                slot_errors: list[BaseException],
-                                monkeypatch: pytest.MonkeyPatch) -> None:
-    """The same with the interface in French (wrong placeholders would raise here)."""
+@pytest.mark.parametrize("code", ["fr", "ar"])
+def test_every_button_in_another_language(window: MainWindow, app_services: AppServices,
+                                          slot_errors: list[BaseException],
+                                          monkeypatch: pytest.MonkeyPatch, code: str) -> None:
+    """The same in French and Arabic (wrong placeholders would raise here)."""
     from money_manager.core.i18n import set_language
 
     populate(app_services)
     monkeypatch.setattr(app_services.ai, "provider", lambda settings=None: ScriptedProvider())
-    set_language("fr")
+    set_language(code)
     try:
         assert click_everything(window) > 60
         click_everything(window)

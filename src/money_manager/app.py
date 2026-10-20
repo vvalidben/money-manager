@@ -5,7 +5,7 @@ import sys
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QLibraryInfo, QThreadPool, QTranslator
+from PySide6.QtCore import QLibraryInfo, Qt, QThreadPool, QTranslator
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
@@ -16,7 +16,12 @@ from money_manager.core.exception_hook import install_exception_hook
 from money_manager.core.logging_setup import configure_logging, shutdown_logging
 from money_manager.core.resources import resource_path
 from money_manager.core.cli import self_test_folder
-from money_manager.core.i18n import language, resolve_language, set_language
+from money_manager.core.i18n import (
+    is_right_to_left,
+    language,
+    resolve_language,
+    set_language,
+)
 from money_manager.persistence.database import Database
 from money_manager.services import AppServices
 from money_manager.services.data_service import ensure_daily_copy
@@ -141,6 +146,8 @@ def run(argv: Sequence[str] | None = None) -> int:
     # The language, like the palette, is chosen before any window is built.
     if set_language(resolve_language(settings.language())) != "en":
         _install_qt_translation(app, language())
+    if is_right_to_left():
+        app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
     motion.set_user_enabled(settings.animations_enabled())
     if settings.daily_copies_enabled():
         try:

@@ -138,3 +138,27 @@ def test_uninstaller_only_removes_listed_names() -> None:
     assert "install-manifest.json" in script and "-notmatch '[\\\\/]'" in script
     assert "LOCALAPPDATA\\MoneyManager" in script  # tells the user their data stays
     assert "Remove-Item -LiteralPath $dir -Recurse" not in script  # never the whole folder
+
+
+def _build_module():
+    spec = importlib.util.spec_from_file_location("mm_build", ROOT / "packaging" / "build.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_signing_is_optional_and_configurable(tmp_path: Path) -> None:
+    build = _build_module()
+    target = tmp_path / "MoneyManager.exe"
+    assert build.signing_command({}, target) is None  # no certificate: not signed
+    tool = str(tmp_path / "signtool.exe")
+    command = build.signing_command({"MM_SIGN_CERT": "cert.pfx", "MM_SIGN_PASSWORD": "pw",
+                                     "MM_SIGNTOOL": tool}, target)
+    assert command[:2] == [tool, "sign"] and ["/f", "cert.pfx", "/p", "pw"] == command[8:12]
+    assert "/tr" in command and command[-1] == str(target)
+    store = build.signing_command({"MM_SIGN_THUMBPRINT": "AB12", "MM_SIGNTOOL": tool}, target)
+    assert ["/sha1", "AB12"] == store[8:10]
+    with pytest.raises(SystemExit):
+        build.signing_command({"MM_SIGN_THUMBPRINT": "AB12",
+                               "ProgramFiles(x86)": str(tmp_path / "none")}, target)

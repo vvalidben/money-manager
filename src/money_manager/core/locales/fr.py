@@ -106,6 +106,10 @@ CATALOG: dict[str, str] = {
         "Un objectif nommé « {0} » existe déjà.",
     "A key ending in {0} is stored in {1}.":
         "Une clé se terminant par {0} est enregistrée dans {1}.",
+    "A loan repayment is due":
+        "Un remboursement de prêt est dû",
+    "A loan should be repaid to you":
+        "Un prêt doit vous être remboursé",
     "A local model must run on this computer (localhost or 127.0.0.1). Use the online provider for remote services.":
         "Un modèle local doit fonctionner sur cet ordinateur (localhost ou 127.0.0.1). Utilisez le fournisseur en ligne pour les services distants.",
     "A recurring entry could not be recorded":
@@ -410,6 +414,8 @@ CATALOG: dict[str, str] = {
         "Les ajustements de solde concernent toujours l'argent Disponible et ne peuvent pas utiliser d'enveloppe.",
     "Balance adjustments do not use a category.":
         "Les ajustements de solde n'utilisent pas de catégorie.",
+    "Balance after":
+        "Solde après",
     "Balance already correct":
         "Le solde est déjà juste",
     "Balance and net worth on {0}":
@@ -438,6 +444,8 @@ CATALOG: dict[str, str] = {
         "Solde ÷ dépense mensuelle moyenne (3 derniers mois complets)",
     "Bank statements":
         "Relevés bancaires",
+    "Based on your scheduled entries, subscriptions and loans only (no complete month of history yet).":
+        "Établie uniquement d'après vos opérations récurrentes, abonnements et prêts (pas encore de mois complet d'historique).",
     "Before a reset":
         "Avant une réinitialisation",
     "Before importing a backup":
@@ -450,6 +458,10 @@ CATALOG: dict[str, str] = {
         "Meilleur mois : <b>{0}</b> ({1} gardés). Mois le plus difficile : <b>{2}</b> ({3}).",
     "Borrowed":
         "Emprunté",
+    "Budget near its limit":
+        "Budget proche de sa limite",
+    "Budget over the limit":
+        "Budget dépassé",
     "Budget removed":
         "Budget supprimé",
     "Budget saved":
@@ -866,6 +878,10 @@ CATALOG: dict[str, str] = {
         "À payer dans les {0} prochains jours",
     "Due today":
         "À payer aujourd'hui",
+    "due today":
+        "dû aujourd'hui",
+    "due tomorrow":
+        "dû demain",
     "Due {0}":
         "Échéance le {0}",
     "Duplicate navigation key: {0!r}":
@@ -1078,6 +1094,8 @@ CATALOG: dict[str, str] = {
         "Importé de {0}",
     "Import…":
         "Importer…",
+    "In 1 allocation":
+        "Dans 1 enveloppe",
     "In a new allocation for this goal (recommended)":
         "Dans une nouvelle enveloppe pour cet objectif (recommandé)",
     "In an allocation I already have":
@@ -1086,8 +1104,8 @@ CATALOG: dict[str, str] = {
         "Dans les catégories budgétées",
     "in goals":
         "dans les objectifs",
-    "In {0} allocation{1}":
-        "Dans {0} enveloppe{1}",
+    "In {0} allocations":
+        "Dans {0} enveloppes",
     "In {0} days":
         "Dans {0} jours",
     "Included:\n":
@@ -1156,6 +1174,8 @@ CATALOG: dict[str, str] = {
         "Investissements exclus · les 5 premières, le reste dans Autres",
     "it contains no tables.":
         "il ne contient aucune table.",
+    "It keeps reminding you here. Right-click the icon to quit.":
+        "Il continue de vous rappeler les échéances ici. Clic droit sur l'icône pour quitter.",
     "its tables do not match this version of Money Manager.":
         "ses tables ne correspondent pas à cette version de Money Manager.",
     "Jan":
@@ -1164,6 +1184,8 @@ CATALOG: dict[str, str] = {
         "juil.",
     "Jun":
         "juin",
+    "Keep Money Manager running in the notification area when the window is closed":
+        "Garder Money Manager dans la zone de notification quand la fenêtre est fermée",
     "Keep recurring payments under control.":
         "Gardez le contrôle de vos paiements récurrents.",
     "Keep the money in “{0}”":
@@ -1248,6 +1270,8 @@ CATALOG: dict[str, str] = {
         "Verrouiller avec Windows Hello",
     "Log files":
         "Fichiers journaux",
+    "Lowest point: {0} on {1}. On {2}: {3}.":
+        "Point le plus bas : {0} le {1}. Au {2} : {3}.",
     "Made by Money Manager {0} on your computer from the entries you recorded. Amounts in {1}. Transfers between your accounts and balance corrections are not counted as income or spending.":
         "Établi par Money Manager {0} sur votre ordinateur à partir des opérations que vous avez enregistrées. Montants en {1}. Les virements entre vos comptes et les corrections de solde ne comptent ni comme revenus ni comme dépenses.",
     "Made by Money Manager {0} on your computer from the entries you recorded. Amounts in {1}. Transfers between your accounts, loans and balance corrections are not counted as income or spending.":
@@ -1266,6 +1290,8 @@ CATALOG: dict[str, str] = {
         "le lundi",
     "Money / Allocations":
         "Argent / Enveloppes",
+    "Money gets tight around {0}: the balance is projected at {1}.":
+        "L'argent devient juste vers le {0} : le solde prévu est de {1}.",
     "Money kept in the allocation “{0}”":
         "Argent gardé dans l'enveloppe « {0} »",
     "Money kept in the allocation “{0}”.":
@@ -1274,6 +1300,8 @@ CATALOG: dict[str, str] = {
         "Sauvegarde Money Manager",
     "Money Manager is locked":
         "Money Manager est verrouillé",
+    "Money Manager is still running":
+        "Money Manager fonctionne toujours",
     "Money Manager saves a copy of all your data before every reset, import or restore, before an update changes how data is stored, and once a day. Restoring a copy replaces your current data, which is itself saved first, so a restore can be undone the same way.":
         "Money Manager enregistre une copie de toutes vos données avant chaque réinitialisation, import ou restauration, avant qu'une mise à jour change la façon dont les données sont stockées, et une fois par jour. Restaurer une copie remplace vos données actuelles, elles-mêmes sauvegardées d'abord, donc une restauration peut être annulée de la même façon.",
     "Money Manager shows {0} today. Enter the balance your bank (or wallet) shows; the difference is recorded as a balance adjustment, so nothing is overwritten and you can see the correction in Transactions.":
@@ -1286,6 +1314,8 @@ CATALOG: dict[str, str] = {
         "MONEY MANAGER · RAPPORT MENSUEL",
     "MONEY MANAGER · YEARLY REPORT":
         "MONEY MANAGER · RAPPORT ANNUEL",
+    "Money may get tight":
+        "L'argent pourrait devenir juste",
     "Money moved":
         "Argent déplacé",
     "Money moved in or out after the last value — update the value to see the current return.":
@@ -1428,6 +1458,8 @@ CATALOG: dict[str, str] = {
         "Nouvelle catégorie de {0}",
     "New…":
         "Nouvelle…",
+    "Next 6 months · scheduled entries, subscriptions, loans and your usual spending":
+        "6 prochains mois · opérations récurrentes, abonnements, prêts et vos dépenses habituelles",
     "Next date":
         "Prochaine date",
     "Next expected":
@@ -1554,6 +1586,8 @@ CATALOG: dict[str, str] = {
         "Rien de mis de côté · au {0}",
     "Nothing to compare with in the previous period":
         "Rien à comparer sur la période précédente",
+    "Notifications":
+        "Notifications",
     "Nov":
         "nov.",
     "Oct":
@@ -1587,7 +1621,7 @@ CATALOG: dict[str, str] = {
     "on this computer":
         "sur cet ordinateur",
     "On track":
-        "Dans les clous",
+        "Dans la limite",
     "Once you start recording transactions, this page will summarise your balance, how your money is allocated and how this month compares to the last.":
         "Dès que vous enregistrez des opérations, cette page résume votre solde, la répartition de votre argent et la comparaison de ce mois-ci avec le précédent.",
     "One column (minus = money out)":
@@ -1610,6 +1644,8 @@ CATALOG: dict[str, str] = {
         "En cours",
     "Open data folder":
         "Ouvrir le dossier des données",
+    "Open Money Manager":
+        "Ouvrir Money Manager",
     "Open the AI Advisor":
         "Ouvrir le conseiller IA",
     "Open without the lock":
@@ -1634,10 +1670,14 @@ CATALOG: dict[str, str] = {
         "Enveloppes en excès de {0} : elles dépassent votre solde réel. Remettez de l'argent d'une enveloppe dans Disponible.",
     "Overdue":
         "En retard",
-    "Overdue by {0} day{1}":
-        "En retard de {0} jour{1}",
+    "Overdue by 1 day":
+        "En retard d'1 jour",
+    "Overdue by {0} days":
+        "En retard de {0} jours",
     "Overdue by {0} {1}":
         "En retard de {0} {1}",
+    "overdue since {0}":
+        "en retard depuis le {0}",
     "Overspent":
         "Dépassement",
     "Overspent this month":
@@ -1664,6 +1704,8 @@ CATALOG: dict[str, str] = {
         "Mettre en pause",
     "Paused":
         "En pause",
+    "Payment {0}":
+        "Paiement {0}",
     "Per month":
         "Par mois",
     "Period":
@@ -1698,6 +1740,10 @@ CATALOG: dict[str, str] = {
         "Gain / perte",
     "Progress":
         "Progression",
+    "Projected balance":
+        "Solde prévu",
+    "Projected balance: {0}":
+        "Solde prévu : {0}",
     "Protect the backup with a password (encrypted)":
         "Protéger la sauvegarde par un mot de passe (chiffrée)",
     "Protected backup":
@@ -1716,6 +1762,8 @@ CATALOG: dict[str, str] = {
         "Question",
     "Question for the advisor":
         "Question pour le conseiller",
+    "Quit Money Manager":
+        "Quitter Money Manager",
     "Ready":
         "Prêt",
     "Ready: {0} on this computer.":
@@ -1804,6 +1852,8 @@ CATALOG: dict[str, str] = {
         "Remboursé",
     "Repay by":
         "Remboursement avant",
+    "Repay {0}":
+        "Rembourser {0}",
     "Repayment from {0}":
         "Remboursement de {0}",
     "Repayment recorded":
@@ -1962,6 +2012,8 @@ CATALOG: dict[str, str] = {
         "Part de votre solde mise de côté dans des enveloppes",
     "Show archived":
         "Afficher les archivés",
+    "Show reminders":
+        "Afficher les rappels",
     "Show the values as a table":
         "Afficher les valeurs dans un tableau",
     "Show {0} as a table":
@@ -2156,6 +2208,8 @@ CATALOG: dict[str, str] = {
         "La première date ne peut pas remonter à plus d'un an.",
     "The first date must be within {0} years.":
         "La première date doit être dans les {0} ans.",
+    "The forecast appears once you have an account":
+        "La prévision apparaît dès que vous avez un compte",
     "The information to send changed after you agreed. Review it and confirm again.":
         "Les informations à envoyer ont changé après votre accord. Vérifiez-les et confirmez à nouveau.",
     "The initial amount cannot be negative.":
@@ -2384,6 +2438,10 @@ CATALOG: dict[str, str] = {
         "Tapez {0} pour confirmer",
     "Type {0} to confirm.":
         "Tapez {0} pour confirmer.",
+    "type|Expense":
+        "Dépense",
+    "type|Income":
+        "Revenu",
     "Typical amount":
         "Montant habituel",
     "UAE dirham":
@@ -2444,6 +2502,8 @@ CATALOG: dict[str, str] = {
         "Appliqué après un redémarrage.",
     "Using the key ending in {0} from {1}.":
         "Utilisation de la clé se terminant par {0} depuis {1}.",
+    "Usual income {0} and spending {1} a month (last {2} complete months), plus everything scheduled.":
+        "Revenus habituels {0} et dépenses {1} par mois (derniers {2} mois complets), plus tout ce qui est prévu.",
     "Usually paid from":
         "Payé habituellement depuis",
     "Valuation {0!r} does not exist.":
@@ -2490,6 +2550,8 @@ CATALOG: dict[str, str] = {
         "Bravo — cet objectif est entièrement financé.",
     "were unchanged":
         "sont inchangées",
+    "What":
+        "Quoi",
     "What the AI received":
         "Ce que l'IA a reçu",
     "What you have":
@@ -2504,6 +2566,8 @@ CATALOG: dict[str, str] = {
         "Où l'argent est-il gardé ?",
     "Where the money went":
         "Où est passé l'argent",
+    "Where your balance is heading":
+        "Où va votre solde",
     "Where your money is kept, and how much is in each account.":
         "Où se trouve votre argent, et combien sur chaque compte.",
     "Who or what":
@@ -2518,6 +2582,8 @@ CATALOG: dict[str, str] = {
         "Windows Hello n'est pas configuré pour votre compte. Ajoutez un code PIN, une empreinte ou le visage dans Paramètres Windows → Comptes → Options de connexion.",
     "Windows Hello is ready.":
         "Windows Hello est prêt.",
+    "Windows notifications for payments due today or tomorrow, budgets near or over their limit, loans to repay within three days, and a balance projected below zero in the next 30 days. Each reminder is shown once, while Money Manager is running.":
+        "Notifications Windows pour les paiements dus aujourd'hui ou demain, les budgets proches ou au-delà de leur limite, les prêts à rembourser dans les trois jours et un solde prévu sous zéro dans les 30 prochains jours. Chaque rappel n'est affiché qu'une fois, tant que Money Manager fonctionne.",
     "Windows' \"Show animations in Windows\" setting is off, so Money Manager stays still as well.":
         "Le réglage Windows « Afficher les animations dans Windows » est désactivé, donc Money Manager reste immobile lui aussi.",
     "Withdraw":
@@ -2552,6 +2618,8 @@ CATALOG: dict[str, str] = {
         "Vous pourrez réserver de l'argent pour l'épargne, les factures, les investissements et plus. Déplacer de l'argent entre enveloppes ne change jamais votre solde total.",
     "Your accounts use {0}. The currency cannot be changed once accounts exist, because Money Manager never converts amounts between currencies.":
         "Vos comptes utilisent {0}. La devise ne peut plus être changée une fois des comptes créés, car Money Manager ne convertit jamais les montants d'une devise à l'autre.",
+    "Your balance is projected at {0} on {1}.":
+        "Votre solde est prévu à {0} le {1}.",
     "Your data from {0} was restored.":
         "Vos données du {0} ont été restaurées.",
     "Your financial data is stored only on this computer, in the database file shown above. Money Manager has no user account, no cloud sync and no telemetry.":
@@ -2612,6 +2680,8 @@ CATALOG: dict[str, str] = {
         "{0} opérations récurrentes enregistrées",
     "{0} recurring expenses detected, about {1} per month{2}; {3} not tracked as subscriptions.":
         "{0} dépenses récurrentes détectées, environ {1} par mois{2} ; {3} non suivies comme abonnements.",
+    "{0} repays":
+        "{0} rembourse",
     "{0} spending of {1} has no history in the previous {2} periods.":
         "Les dépenses {0} de {1} n'ont pas d'historique sur les {2} périodes précédentes.",
     "{0} spending of {1} is {2}x its average of {3} over the previous {4} periods.":
@@ -2650,6 +2720,8 @@ CATALOG: dict[str, str] = {
         "{0} · {1}\nPatrimoine net : {2}\nSolde : {3}\nInvestissements : {4}",
     "{0} · {1} a month":
         "{0} · {1} par mois",
+    "{0} · {1} left · by {2}":
+        "{0} · reste {1} · avant le {2}",
     "{0} · {1} to Available":
         "{0} · {1} vers Disponible",
     "{0} · {1} {2} (second half vs first half of the range)":
@@ -2662,6 +2734,8 @@ CATALOG: dict[str, str] = {
         "{0}, année en cours",
     "{0}: {1} of the monthly limit":
         "{0} : {1} de la limite mensuelle",
+    "{0}: {1} spent of {2}":
+        "{0} : {1} dépensés sur {2}",
     "{0}: {1}, with no spending in the comparison period.":
         "{0} : {1}, sans aucune dépense sur la période de comparaison.",
     "{0}: {1}; nothing recorded in the comparison period ({2}).":

@@ -62,6 +62,7 @@ class AISettingsCard(Card):
         intro.setWordWrap(True)
 
         self.mode_combo = QComboBox()
+        self.mode_combo.setAccessibleName(tr("Provider"))
         for mode, label in MODE_LABELS.items():
             self.mode_combo.addItem(tr(label), mode.value)
         self.mode_combo.currentIndexChanged.connect(self._update_sections)
@@ -71,6 +72,7 @@ class AISettingsCard(Card):
         self.local_url_edit = QLineEdit()
         self.local_url_edit.setPlaceholderText("http://localhost:11434")
         self.local_model_combo = QComboBox()
+        self.local_model_combo.setAccessibleName(tr("Local model"))
         self.local_model_combo.setEditable(True)
         self.local_model_combo.setPlaceholderText(tr("e.g. llama3.2"))
         compact_combo(self.local_model_combo, 14)
@@ -108,6 +110,7 @@ class AISettingsCard(Card):
         key_layout.addWidget(self.remove_key_button)
 
         self.timeout_spin = QSpinBox()
+        self.timeout_spin.setAccessibleName(tr("Timeout"))
         self.timeout_spin.setRange(MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS)
         self.timeout_spin.setSuffix(" seconds")
         # Typed or changed with the arrow keys; the styled box has no room for arrows.

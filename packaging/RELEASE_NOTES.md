@@ -1,10 +1,23 @@
-# Money Manager 1.5.0
+# Money Manager 1.6.0
 
 A local-first personal finance application for Windows. Your data stays in a
 database on your computer; nothing is sent anywhere unless you use online AI
 and confirm each request.
 
-## What's new in 1.5.0
+## What's new in 1.6.0
+
+- **Where your balance is heading.** A dashboard chart of your balance for the
+  next 6 months — your recurring entries, subscriptions, loans and usual
+  spending — with a warning when money is going to get tight.
+- **Reminders.** Windows notifications for payments due, budgets near their
+  limit, loans to repay and a balance about to go below zero (Settings →
+  Notifications). Money Manager can keep running in the notification area.
+- **العربية.** Settings → Appearance → Language: the whole app in Arabic, right
+  to left, with Moroccan month names.
+- **Details.** Every control has a name for screen readers, French wording
+  improvements, and the build can sign the program once a certificate is set up.
+
+## New in 1.5.0
 
 - **En français.** Settings → Appearance → Language: English, Français, or the
   same as Windows. Amounts and dates are written the French way

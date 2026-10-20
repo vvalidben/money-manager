@@ -70,7 +70,7 @@ def summary_stats(summary: AllocationSummary) -> tuple[StatView, ...]:
         StatView(tr("Total balance"), format_money(total), tr("All accounts together"),
                  "outflow" if total.is_negative() else "neutral"),
         StatView(tr("Set aside"), format_money(summary.allocated_total),
-                 tr("In {0} allocation{1}", count, '' if count == 1 else 's')),
+                 (tr("In 1 allocation") if count == 1 else tr("In {0} allocations", count))),
         StatView(tr("Allocations"), str(count), tr("Goals keep their money in one")),
     )
 

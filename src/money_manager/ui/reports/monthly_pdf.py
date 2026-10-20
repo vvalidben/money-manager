@@ -13,11 +13,11 @@ from io import BytesIO
 from pathlib import Path
 
 from matplotlib.figure import Figure
-from PySide6.QtCore import QMarginsF, QSizeF, QUrl
+from PySide6.QtCore import QMarginsF, QSizeF, Qt, QUrl
 from PySide6.QtGui import QFont, QImage, QPageLayout, QPageSize, QPdfWriter, QTextDocument
 
 from money_manager import __version__
-from money_manager.core.i18n import tr
+from money_manager.core.i18n import is_right_to_left, tr
 from money_manager.domain.analytics import CategoryAmount
 from money_manager.domain.investments import NetWorthPoint
 from money_manager.domain.money import sum_money
@@ -77,6 +77,10 @@ def build_document(report: MonthlyReport) -> QTextDocument:
     document = QTextDocument()
     document.setDefaultFont(QFont(FONT_FAMILY, 10))
     document.setDocumentMargin(0)
+    if is_right_to_left():
+        option = document.defaultTextOption()
+        option.setTextDirection(Qt.LayoutDirection.RightToLeft)
+        document.setDefaultTextOption(option)
     # A page size of its own keeps Qt from adding a second margin when printing.
     text_height_mm = A4_MM[1] - MARGINS_MM.top() - MARGINS_MM.bottom()
     document.setPageSize(QSizeF(TEXT_WIDTH_PX, text_height_mm / 25.4 * LAYOUT_DPI))
@@ -96,7 +100,8 @@ def report_html(report: MonthlyReport, *, charts: set[str] | None = None) -> str
     parts = [STYLE, _title(report), _summary(report), _net_worth(report, NET_WORTH_URL in charts),
              _budgets(report), _goals(report), _spending(report, SPENDING_URL in charts),
              _largest(report), _footer(report)]
-    return "<html><body>" + "".join(parts) + "</body></html>"
+    direction = " dir='rtl'" if is_right_to_left() else ""
+    return f"<html><body{direction}>" + "".join(parts) + "</body></html>"
 
 
 STYLE = f"""<style>

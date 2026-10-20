@@ -7,10 +7,19 @@ page refreshes only when it is shown, so hidden pages cost no queries.
 import logging
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QDialog, QFrame, QGridLayout, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QDialog,
+    QFrame,
+    QGridLayout,
+    QLabel,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from money_manager.core.errors import MoneyManagerError
 from money_manager.domain.dashboard import DashboardOverview
+from money_manager.domain.forecast import Forecast
 from money_manager.domain.investments import NetWorthPoint
 from money_manager.services import AppServices
 from money_manager.ui import dialogs
@@ -20,10 +29,13 @@ from money_manager.ui.charts.base import ChartCard
 from money_manager.ui.charts.money import (
     BalanceHistoryChart,
     CategorySpendingChart,
+    ForecastChart,
     IncomeExpenseChart,
     NetWorthChart,
     balance_history_table,
     category_spending_table,
+    forecast_note,
+    forecast_table,
     income_expense_table,
     net_worth_table,
 )
@@ -48,7 +60,7 @@ from money_manager.ui.pages.registry import (
     TRANSACTIONS_PAGE_KEY,
     PageSpec,
 )
-from money_manager.ui.theme import SIDE_BY_SIDE_MIN_WIDTH, Spacing
+from money_manager.ui.theme import SIDE_BY_SIDE_MIN_WIDTH, Spacing, set_style_property
 from money_manager.ui.transactions.rows import TransferSide, build_rows, transfer_sides
 from money_manager.core.i18n import tr
 
@@ -70,6 +82,15 @@ class DashboardPage(BasePage):
             tr("Income vs expenses"), tr("Last 6 months · adjustments excluded"), IncomeExpenseChart()
         )
         self.allocation_card = AllocationOverview()
+        self.forecast_card = ChartCard(
+            tr("Where your balance is heading"),
+            tr("Next 6 months · scheduled entries, subscriptions, loans and your usual "
+               "spending"), ForecastChart())
+        self.forecast_note = QLabel()
+        self.forecast_note.setObjectName("MutedLabel")
+        self.forecast_note.setWordWrap(True)
+        self.forecast_card.body.addWidget(self.forecast_note)
+        self.forecast: Forecast | None = None
         self.net_worth_card = ChartCard(
             tr("Net worth"), tr("Balance plus investment values at the end of each month"),
             NetWorthChart(height_px=220),
@@ -101,6 +122,7 @@ class DashboardPage(BasePage):
         self.stats_row = ResponsiveRow(self.stat_cards, min_item_width=210)
         grid.addWidget(self.stats_row, 0, 0, 1, 12)  # 12-column grid
         grid.addWidget(self.net_worth_card, 1, 0, 1, 12)
+        grid.addWidget(self.forecast_card, 2, 0, 1, 12)
         self.pair_rows = [
             AdaptiveRow([(left, 7), (right, 5)], SIDE_BY_SIDE_MIN_WIDTH)
             for left, right in ((self.flows_card, self.allocation_card),
@@ -108,7 +130,7 @@ class DashboardPage(BasePage):
                                 (self.recent_card, self.health_card),
                                 (self.goals_card, self.renewing_card))
         ]
-        for row, pair in enumerate(self.pair_rows, start=2):
+        for row, pair in enumerate(self.pair_rows, start=3):
             grid.addWidget(pair, row, 0, 1, 12)
         for column in range(12):
             grid.setColumnStretch(column, 1)
@@ -137,7 +159,8 @@ class DashboardPage(BasePage):
         scroll.viewport().setAutoFillBackground(False)
         self.content.setObjectName("TransparentArea")
         self.add_content(scroll, stretch=1)
-        self._grid_widgets = [self.stats_row, self.net_worth_card, self.flows_card, self.allocation_card,
+        self._grid_widgets = [self.stats_row, self.net_worth_card, self.forecast_card,
+                              self.flows_card, self.allocation_card,
                               self.balance_card, self.spending_card, self.recent_card,
                               self.health_card, self.goals_card, self.renewing_card]
 
@@ -151,6 +174,7 @@ class DashboardPage(BasePage):
         try:
             overview = self._services.dashboard.overview()
             net_worth = self._services.net_worth.history()
+            forecast = self._services.forecast.forecast()
             self.renewals = renewal_views(self._services.subscriptions.upcoming())
             names = {account.id: account.name for account in self._services.accounts.list()}
             self.transfer_labels = transfer_sides(
@@ -161,6 +185,7 @@ class DashboardPage(BasePage):
             return
         self.overview = overview
         self.net_worth = net_worth
+        self.forecast = forecast
         self.view = build_dashboard_view(overview)
         self._render(overview, self.view)
 
@@ -184,6 +209,11 @@ class DashboardPage(BasePage):
 
         self.net_worth_card.chart.render(self.net_worth)
         self.net_worth_card.set_table(net_worth_table(self.net_worth))
+        self.forecast_card.chart.render(self.forecast)
+        self.forecast_card.set_table(forecast_table(self.forecast))
+        note, warning = forecast_note(self.forecast)
+        self.forecast_note.setText(note)
+        set_style_property(self.forecast_note, "tone", "warning" if warning else "neutral")
         self.flows_card.chart.render(overview.monthly_flows)
         self.flows_card.set_table(income_expense_table(overview.monthly_flows))
         self.balance_card.chart.render(overview.balance_history)

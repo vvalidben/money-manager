@@ -331,3 +331,19 @@ def test_main_window_opens_on_dashboard_and_view_all_switches_page(
     finally:
         window.close()
         window.deleteLater()
+
+
+def test_forecast_card(page: DashboardPage, app_services: AppServices, populated: None) -> None:
+    rent = app_services.categories.create("Car", CategoryKind.EXPENSE)
+    bank = app_services.accounts.list()[0]
+    app_services.recurring.create("Car loan", type="expense", amount="40000",
+                                  account_id=bank.id, category_id=rent.id,
+                                  frequency="monthly", first_date=date(2026, 7, 5))
+    page.refresh()
+    assert page.forecast is not None
+    assert "Money gets tight around 05 Jul 2026" in page.forecast_note.text()
+    assert page.forecast_note.property("tone") == "warning"
+    page.forecast_card.toggle_button.click()
+    table = page.forecast_card.table
+    assert [table.item(0, c).text() for c in range(3)] == ["05 Jul 2026", "Car loan",
+                                                           "−40,000.00 MAD"]

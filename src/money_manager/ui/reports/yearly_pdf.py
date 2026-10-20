@@ -3,11 +3,11 @@
 from html import escape
 from pathlib import Path
 
-from PySide6.QtCore import QSizeF, QUrl
+from PySide6.QtCore import QSizeF, Qt, QUrl
 from PySide6.QtGui import QFont, QImage, QPageLayout, QPageSize, QPdfWriter, QTextDocument
 
 from money_manager import __version__
-from money_manager.core.i18n import tr
+from money_manager.core.i18n import is_right_to_left, tr
 from money_manager.domain.report import YearlyReport
 from money_manager.ui.charts.base import plot_value
 from money_manager.ui.formatting import (
@@ -47,6 +47,10 @@ def write_yearly_report(report: YearlyReport, path: Path) -> None:
     document = QTextDocument()
     document.setDefaultFont(QFont(FONT_FAMILY, 10))
     document.setDocumentMargin(0)
+    if is_right_to_left():
+        option = document.defaultTextOption()
+        option.setTextDirection(Qt.LayoutDirection.RightToLeft)
+        document.setDefaultTextOption(option)
     height_mm = A4_MM[1] - MARGINS_MM.top() - MARGINS_MM.bottom()
     document.setPageSize(QSizeF(TEXT_WIDTH_PX, height_mm / 25.4 * LAYOUT_DPI))
     images = {MONTHS_URL: months_chart(report),
@@ -80,7 +84,8 @@ def report_html(report: YearlyReport, *, charts: set[str] | None = None) -> str:
     parts = [STYLE, _title(report), _summary(report), _months(report, MONTHS_URL in charts),
              _net_worth(report, NET_WORTH_URL in charts),
              _spending(report, SPENDING_URL in charts), _largest(report), _footer(report)]
-    return "<html><body>" + "".join(parts) + "</body></html>"
+    direction = " dir='rtl'" if is_right_to_left() else ""
+    return f"<html><body{direction}>" + "".join(parts) + "</body></html>"
 
 
 def _title(report: YearlyReport) -> str:

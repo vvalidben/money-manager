@@ -225,10 +225,17 @@ class Sidebar(QFrame):
     def expanded(self) -> bool:
         return self._expanded
 
+    def _rect(self, width: int, height: int) -> QRect:
+        """At the leading edge: left, or right in a right-to-left language (it then
+        grows towards the left)."""
+        parent = self.parentWidget()
+        x = parent.width() - width if self.isRightToLeft() and parent is not None else 0
+        return QRect(x, 0, width, height)
+
     def place(self, height: int) -> None:
-        """Keep the rail at the left edge, full height, at its current width."""
+        """Keep the rail at the leading edge, full height, at its current width."""
         self._animation.stop()
-        self.setGeometry(0, 0, EXPANDED_WIDTH if self._expanded else RAIL_WIDTH, height)
+        self.setGeometry(self._rect(EXPANDED_WIDTH if self._expanded else RAIL_WIDTH, height))
         if not self._expanded:
             self._show_labels(False)
         self.raise_()
@@ -241,7 +248,7 @@ class Sidebar(QFrame):
         self._animation.stop()
         self._animation.setStartValue(self.geometry())
         self._animation.setEndValue(
-            QRect(0, 0, EXPANDED_WIDTH if expanded else RAIL_WIDTH, self.height()))
+            self._rect(EXPANDED_WIDTH if expanded else RAIL_WIDTH, self.height()))
         self.raise_()
         self._animation.start()
 
